@@ -101,53 +101,30 @@ export default function CvEvaluator() {
     setIsAnalyzing(true);
 
     try {
-      // Genera una congruenza a stelle casuale (da 1 a 5 stelle) per il mock, convertita in scala su 100
-      const randomStars = Math.floor(Math.random() * 4) + 2; // Da 2 a 5 stelle di test
-      const scoreOn100 = randomStars * 20;
-
-      const mockAnalysis = {
-        strengths: [
-          `Forte corrispondenza tecnica con i requisiti dell'annuncio: ${extractedJobTitle}`,
-          `Possesso delle certificazioni chiave rilevate: ${extractedSkills.slice(0, 2).join(', ')}.`
-        ],
-        weaknesses: [
-          'Richiede un breve periodo di affiancamento iniziale sui quadri elettrici di media tensione.'
-        ],
-        certifications: extractedSkills,
-        location_proximity: 'Residente in prossimità della sede logistica aziendale.',
-        job_match_justification: `Il candidato presenta una congruenza di ${randomStars} su 5 stelle con l'annuncio web specificato. Ottima attinenza tecnica delle esperienze maturate.`
-      };
-
-      const payload = {
-        tenant_id: tenant?.id,
-        candidate_name: candidateName,
-        applied_role: extractedJobTitle,
-        cv_file_url: 'https://hmpxgbzykwwqgfzifdlc.supabase.co/storage/v1/object/public/cv/esempio.pdf',
-        score: scoreOn100,
-        ai_analysis_json: mockAnalysis,
-        status: 'da_valutare'
-      };
-
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/cv_candidates`, {
+      const response = await fetch("https://n8n.rmstudio.app/webhook/compare-cv", {
         method: 'POST',
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          tenant_id: tenant?.id,
+          candidate_name: candidateName,
+          applied_role: extractedJobTitle,
+          cv_file_url: 'https://hmpxgbzykwwqgfzifdlc.supabase.co/storage/v1/object/public/cv/esempio.pdf' // URL del PDF caricato
+        })
       });
 
-      if (res.ok) {
+      if (response.ok) {
         setCandidateName('');
-        await fetchCandidates();
+        await fetchCandidates(); // Ricarica la tabella con i risultati elaborati da n8n
+      } else {
+        alert("Errore durante l'elaborazione del CV su n8n.");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Errore di connessione a n8n:", err);
     } finally {
       setIsAnalyzing(false);
     }
-  };
 
   // Funzione helper per disegnare le stelle dorate basate sul punteggio
   const renderStars = (score: number) => {
