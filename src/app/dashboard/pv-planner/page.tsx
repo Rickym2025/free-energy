@@ -76,12 +76,13 @@ export default function PvPlanner() {
     const L = (window as any).L;
     if (!L) return;
 
-    // Inizializzazione mappa con zoom massimo esteso a 20 per precisione
-    const map = L.map('map-pv', { maxZoom: 20 }).setView([41.9028, 12.4964], 6);
+    // Impostiamo maxZoom a 19 per evitare l'errore 401 delle API Esri
+    const map = L.map('map-pv', { maxZoom: 19 }).setView([41.9028, 12.4964], 6);
     mapRef.current = map;
 
+    // Anche il TileLayer deve bloccarsi a zoom 19
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 20,
+      maxZoom: 19,
       attribution: 'Esri, Maxar'
     }).addTo(map);
 
