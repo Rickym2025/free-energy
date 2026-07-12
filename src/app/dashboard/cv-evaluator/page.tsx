@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useTenant } from '../../../context/TenantContext';
+import { useTenant } from '@/context/TenantContext';
 
 interface Candidate {
   id: string;
