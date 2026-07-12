@@ -16,10 +16,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Stato Chatbot "Giulia AI"
-  const [chatOpen, setChatOpen] = useState(false);
+  // Chatbot Giulia AI: impostato ad APERTURA AUTOMATICA di default (true)
+  const [chatOpen, setChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'init-1', text: "Ciao! Sono Giulia, l'assistente di Free Energy. Sono qui per aiutarti a configurare la piattaforma e ad usare i moduli al meglio.", sender: 'bot' }
+    { id: 'init-1', text: "Ciao! Sono Giulia, l'assistente virtuale di Free Energy. Sono qui per aiutarti a configurare la piattaforma e ad usare i moduli al meglio.", sender: 'bot' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -64,7 +64,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       setMessages(prev => [...prev, { id: 'bot-' + Date.now(), text: reply, sender: 'bot' }]);
     } catch (err) {
-      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Scusami, connessione al server n8n interrotta.', sender: 'bot' }]);
+      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Connessione con Giulia temporaneamente offline.', sender: 'bot' }]);
     } finally {
       setIsTyping(false);
     }
@@ -142,7 +142,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <div ref={messagesEndRef} />
             </div>
             
-            {/* Chips di selezione rapida */}
             <div className="px-4 py-2 bg-zinc-900 flex gap-1.5 overflow-x-auto scrollbar-none border-t border-zinc-850">
               <button onClick={() => sendChatMessage("Come uso il PV Planner?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">🛰️ PV Planner</button>
               <button onClick={() => sendChatMessage("Come si caricano i CV?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">📄 Valutazione CV</button>
