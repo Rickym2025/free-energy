@@ -25,10 +25,10 @@ export default function PvPlanner() {
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
 
   // Configurazione dei parametri economici
-  const [costPerKwp, setCostPerKwp] = useState(1300); // Costo industriale più basso per kWp
+  const [costPerKwp, setCostPerKwp] = useState(1300); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
-  const [storageCapacity, setStorageCapacity] = useState(15); // Batterie più grandi per industria
+  const [storageCapacity, setStorageCapacity] = useState(15); 
   const [costPerKwhStorage, setCostPerKwhStorage] = useState(600);
 
   // Campi di output calcolati ed editabili
@@ -37,7 +37,7 @@ export default function PvPlanner() {
   const [annualProduction, setAnnualProduction] = useState(0);
   const [annualSavings, setAnnualSavings] = useState(0);
   const [estimatedCost, setEstimatedCost] = useState(0);
-  const [monthlyBill, setMonthlyBill] = useState('600'); // Bolletta industriale di default
+  const [monthlyBill, setMonthlyBill] = useState('600'); 
 
   const mapRef = useRef<any>(null);
   const activeMarkersRef = useRef<any[]>([]);
@@ -48,7 +48,6 @@ export default function PvPlanner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Iniezione degli stili CSS per la precisione di puntamento e la stampa della mappa a colori
     const styleEl = document.createElement('style');
     styleEl.innerHTML = `
       .leaflet-container { cursor: crosshair !important; }
@@ -90,18 +89,16 @@ export default function PvPlanner() {
     const L = (window as any).L;
     if (!L) return;
 
-    // Zoom esteso a 22 per permettere una precisione millimetrica sui capannoni
+    // Zoom visivo della mappa esteso a 22, maxNativeZoom a 19 per prevenire errori 401
     const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
     mapRef.current = map;
 
-    // maxNativeZoom a 19 previene gli errori 401 e la visualizzazione grigia a zoom elevato
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 22,
       maxNativeZoom: 19,
       attribution: 'Esri, Maxar'
     }).addTo(map);
 
-    // Contenitore per i disegni dei pannelli fotovoltaici
     panelsLayerGroupRef.current = L.layerGroup().addTo(map);
 
     map.on('click', (e: any) => {
@@ -129,7 +126,18 @@ export default function PvPlanner() {
     });
   };
 
-  // Funzione geometrica di Ray-Casting per verificare se un punto è dentro la falda del tetto
+  // Funzione per ripulire la falda temporanea corrente (Richiamata in reset e salvataggio)
+  const clearMapPoints = () => {
+    setCurrentPoints([]);
+    setIsCalculated(false);
+    activeMarkersRef.current.forEach(m => m.remove());
+    activeMarkersRef.current = [];
+    if (activePolygonRef.current) {
+      activePolygonRef.current.remove();
+      activePolygonRef.current = null;
+    }
+  };
+
   const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]) => {
     const x = point.lat, y = point.lng;
     let inside = false;
@@ -142,12 +150,10 @@ export default function PvPlanner() {
     return inside;
   };
 
-  // Disegna i pannelli reali all'interno del tetto tracciato
   const drawPanelsInsidePolygon = (points: Coordinate[]) => {
     const L = (window as any).L;
     if (!L || points.length < 3) return;
 
-    // Trova l'ingombro (Bounding Box) della falda
     const lats = points.map(p => p.lat);
     const lngs = points.map(p => p.lng);
     const minLat = Math.min(...lats);
@@ -155,22 +161,20 @@ export default function PvPlanner() {
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
 
-    // Dimensioni approssimate di un pannello da 430W (1.65m x 1m) in coordinate geografiche
-    const latStep = 0.000015; // circa 1.65 metri in latitudine
-    const lngStep = 0.000012; // circa 1 metro in longitudine
+    const latStep = 0.000015; 
+    const lngStep = 0.000012; 
 
     for (let lat = minLat; lat < maxLat; lat += latStep) {
       for (let lng = minLng; lng < maxLng; lng += lngStep) {
         const center = { lat: lat + latStep / 2, lng: lng + lngStep / 2 };
         
-        // Se il pannello è interamente dentro la falda, disegnalo
         if (isPointInPolygon(center, points)) {
           L.rectangle([
             [lat, lng],
-            [lat + latStep * 0.9, lng + lngStep * 0.9] // Lasciamo una piccola fessura tra i pannelli
+            [lat + latStep * 0.9, lng + lngStep * 0.9]
           ], {
-            color: '#1e293b', // Colore telaio argento scuro
-            fillColor: '#0f172a', // Blu notte silicio
+            color: '#1e293b', 
+            fillColor: '#0f172a', 
             fillOpacity: 0.9,
             weight: 1
           }).addTo(panelsLayerGroupRef.current);
@@ -195,7 +199,6 @@ export default function PvPlanner() {
     return Math.abs(area / 2);
   };
 
-  // Salva la falda corrente e permette di tracciarne un'altra (Falde Multiple)
   const handleSaveCurrentRoof = () => {
     if (currentPoints.length < 3) {
       alert("Definisci almeno 3 punti sulla mappa prima di salvare questa falda.");
@@ -205,16 +208,14 @@ export default function PvPlanner() {
     const area = calculateAreaInSqm(currentPoints);
     const L = (window as any).L;
 
-    // Disegna i pannelli reali all'interno di questa falda salvata
     drawPanelsInsidePolygon(currentPoints);
 
-    // Salva il poligono visivo e cancella i marker temporanei
     const savedPolygon = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
     savedPolygonsRef.current.push(savedPolygon);
 
     setSavedRoofs(prev => [...prev, { id: `roof-${Date.now()}`, points: currentPoints, area }]);
     
-    // Pulisci l'area di disegno temporanea
+    // Pulisci l'area temporanea
     activeMarkersRef.current.forEach(m => m.remove());
     activeMarkersRef.current = [];
     if (activePolygonRef.current) activePolygonRef.current.remove();
@@ -223,7 +224,6 @@ export default function PvPlanner() {
   };
 
   const handleGenerateReport = async () => {
-    // Se c'è ancora una falda in fase di disegno, la salviamo in automatico
     let finalRoofs = [...savedRoofs];
     if (currentPoints.length >= 3) {
       const area = calculateAreaInSqm(currentPoints);
@@ -236,7 +236,6 @@ export default function PvPlanner() {
       return;
     }
 
-    // Somma dinamica delle aree di tutti i tetti tracciati
     const totalArea = finalRoofs.reduce((acc, r) => acc + r.area, 0);
     setTotalAreaSqm(totalArea);
 
@@ -285,6 +284,31 @@ export default function PvPlanner() {
     if (panelsLayerGroupRef.current) panelsLayerGroupRef.current.clearLayers();
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address) return;
+    setLoadingGeocode(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const newCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
+        handleResetPlanner();
+        if (mapRef.current) {
+          mapRef.current.setView([newCoords.lat, newCoords.lng], 19); 
+        }
+      } else {
+        alert("Indirizzo non trovato.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingGeocode(false);
+    }
+  };
+
+  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
   const brandColor = tenant?.brand_color_hex || '#0284c7';
 
   return (
@@ -296,7 +320,7 @@ export default function PvPlanner() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
         
-        {/* Controlli di Progettazione */}
+        {/* Controlli */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-5">
           <form onSubmit={handleSearch} className="space-y-2">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Cerca Capannone / Sito</label>
@@ -321,7 +345,7 @@ export default function PvPlanner() {
                 </div>
               </div>
 
-              <div className="bg-zinc-800 p-3 rounded-xl border border-zinc-750 space-y-2">
+              <div className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-zinc-300 font-bold">Batterie d'Accumulo (Industrial)</span>
                   <input type="checkbox" checked={includeStorage} onChange={(e) => setIncludeStorage(e.target.checked)} className="rounded text-emerald-500" />
@@ -382,12 +406,6 @@ export default function PvPlanner() {
               <p>Email: {tenant?.notification_email || 'tecnico@novasolar.it'}</p>
               <p>Data Offerta: {new Date().toLocaleDateString()}</p>
             </div>
-          </div>
-
-          {/* Area di stampa in cui compare la mappa satellitare e la disposizione dei moduli */}
-          <div className="hidden print:block space-y-2">
-            <h3 className="text-sm font-bold text-zinc-800 uppercase tracking-wider">Layout di posizionamento moduli (Vista Satellitare):</h3>
-            {/* Vercel sposta la mappa qui durante l'esecuzione di window.print() */}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 print:grid-cols-5">
