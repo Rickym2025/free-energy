@@ -10,8 +10,11 @@ interface Coordinate {
 
 interface SavedRoof {
   id: string;
+  name: string; // Campo di testo editabile dall'utente
   points: Coordinate[];
   area: number;
+  polygonLayer: any; // Riferimento al poligono di Leaflet per poterlo rimuovere
+  panelLayers: any[]; // Riferimento ai pannelli di Leaflet per poterli rimuovere
 }
 
 export default function PvPlanner() {
@@ -20,18 +23,18 @@ export default function PvPlanner() {
   const [loadingGeocode, setLoadingGeocode] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
 
-  // Gestione di falde multiple (Tetti multipli del capannone)
+  // Stato per falde salvate e punti correnti in disegno
   const [savedRoofs, setSavedRoofs] = useState<SavedRoof[]>([]);
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
 
-  // Configurazione dei parametri economici
+  // Parametri economici personalizzabili
   const [costPerKwp, setCostPerKwp] = useState(1300); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState(15); 
   const [costPerKwhStorage, setCostPerKwhStorage] = useState(600);
 
-  // Campi di output calcolati ed editabili
+  // Campi output
   const [totalAreaSqm, setTotalAreaSqm] = useState(0);
   const [peakPower, setPeakPower] = useState(0);
   const [annualProduction, setAnnualProduction] = useState(0);
@@ -42,8 +45,6 @@ export default function PvPlanner() {
   const mapRef = useRef<any>(null);
   const activeMarkersRef = useRef<any[]>([]);
   const activePolygonRef = useRef<any>(null);
-  const savedPolygonsRef = useRef<any[]>([]);
-  const panelsLayerGroupRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -89,7 +90,7 @@ export default function PvPlanner() {
     const L = (window as any).L;
     if (!L) return;
 
-    // Zoom visivo della mappa esteso a 22, maxNativeZoom a 19 per prevenire errori 401
+    // Zoom visivo esteso a 22, maxNativeZoom a 19 per zoom satellitare nitido senza blocchi 401
     const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
     mapRef.current = map;
 
@@ -98,8 +99,6 @@ export default function PvPlanner() {
       maxNativeZoom: 19,
       attribution: 'Esri, Maxar'
     }).addTo(map);
-
-    panelsLayerGroupRef.current = L.layerGroup().addTo(map);
 
     map.on('click', (e: any) => {
       const { lat, lng } = e.latlng;
@@ -126,10 +125,34 @@ export default function PvPlanner() {
     });
   };
 
-  // Funzione per ripulire la falda temporanea corrente (Richiamata in reset e salvataggio)
+  // Annulla l'ultimo segnaposto inserito per errore
+  const handleUndoLastPoint = () => {
+    if (currentPoints.length === 0) return;
+    const L = (window as any).L;
+
+    setCurrentPoints(prev => {
+      const updated = prev.slice(0, -1);
+      
+      // Rimuovi l'ultimo marker visivo
+      const lastMarker = activeMarkersRef.current.pop();
+      if (lastMarker) lastMarker.remove();
+
+      // Aggiorna o rimuovi il poligono
+      if (activePolygonRef.current) {
+        if (updated.length >= 3) {
+          activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
+        } else {
+          activePolygonRef.current.remove();
+          activePolygonRef.current = null;
+        }
+      }
+      return updated;
+    });
+  };
+
+  // Pulisce l'area di disegno corrente
   const clearMapPoints = () => {
     setCurrentPoints([]);
-    setIsCalculated(false);
     activeMarkersRef.current.forEach(m => m.remove());
     activeMarkersRef.current = [];
     if (activePolygonRef.current) {
@@ -138,21 +161,27 @@ export default function PvPlanner() {
     }
   };
 
+  // Algoritmo di Ray-Casting corretto (X = Longitudine, Y = Latitudine)
   const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]) => {
-    const x = point.lat, y = point.lng;
+    const x = point.lng;
+    const y = point.lat;
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].lat, yi = polygon[i].lng;
-      const xj = polygon[j].lat, yj = polygon[j].lng;
+      const xi = polygon[i].lng;
+      const yi = polygon[i].lat;
+      const xj = polygon[j].lng;
+      const yj = polygon[j].lat;
       const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
       if (intersect) inside = !inside;
     }
     return inside;
   };
 
-  const drawPanelsInsidePolygon = (points: Coordinate[]) => {
+  // Calcola e posiziona i moduli reali (1.65m x 1m) all'interno della falda
+  const generatePanels = (points: Coordinate[]): any[] => {
     const L = (window as any).L;
-    if (!L || points.length < 3) return;
+    const addedPanels: any[] = [];
+    if (!L || points.length < 3) return addedPanels;
 
     const lats = points.map(p => p.lat);
     const lngs = points.map(p => p.lng);
@@ -169,7 +198,7 @@ export default function PvPlanner() {
         const center = { lat: lat + latStep / 2, lng: lng + lngStep / 2 };
         
         if (isPointInPolygon(center, points)) {
-          L.rectangle([
+          const panel = L.rectangle([
             [lat, lng],
             [lat + latStep * 0.9, lng + lngStep * 0.9]
           ], {
@@ -177,10 +206,12 @@ export default function PvPlanner() {
             fillColor: '#0f172a', 
             fillOpacity: 0.9,
             weight: 1
-          }).addTo(panelsLayerGroupRef.current);
+          }).addTo(mapRef.current);
+          addedPanels.push(panel);
         }
       }
     }
+    return addedPanels;
   };
 
   const calculateAreaInSqm = (points: Coordinate[]) => {
@@ -199,41 +230,74 @@ export default function PvPlanner() {
     return Math.abs(area / 2);
   };
 
+  // Conferma la falda corrente e la inserisce nella tabella laterale
   const handleSaveCurrentRoof = () => {
     if (currentPoints.length < 3) {
-      alert("Definisci almeno 3 punti sulla mappa prima di salvare questa falda.");
+      alert("Definisci almeno 3 segnaposto sulla mappa satellitare prima di salvare l'area.");
       return;
     }
 
     const area = calculateAreaInSqm(currentPoints);
     const L = (window as any).L;
 
-    drawPanelsInsidePolygon(currentPoints);
+    // Genera e disegna i pannelli fotovoltaici
+    const panelLayers = generatePanels(currentPoints);
 
-    const savedPolygon = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
-    savedPolygonsRef.current.push(savedPolygon);
+    // Salva il poligono di sfondo
+    const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
 
-    setSavedRoofs(prev => [...prev, { id: `roof-${Date.now()}`, points: currentPoints, area }]);
-    
-    // Pulisci l'area temporanea
-    activeMarkersRef.current.forEach(m => m.remove());
-    activeMarkersRef.current = [];
-    if (activePolygonRef.current) activePolygonRef.current.remove();
-    activePolygonRef.current = null;
-    setCurrentPoints([]);
+    const index = savedRoofs.length + 1;
+    const newRoof: SavedRoof = {
+      id: `roof-${Date.now()}`,
+      name: `Area Tetto #${index}`,
+      points: currentPoints,
+      area,
+      polygonLayer,
+      panelLayers
+    };
+
+    setSavedRoofs(prev => [...prev, newRoof]);
+    clearMapPoints(); // Resetta l'area temporanea per la prossima falda
+  };
+
+  // Rimuove una falda specifica cancellando i disegni dalla mappa satellitare
+  const handleDeleteRoof = (id: string) => {
+    const roofToDelete = savedRoofs.find(r => r.id === id);
+    if (roofToDelete) {
+      if (roofToDelete.polygonLayer) roofToDelete.polygonLayer.remove();
+      if (roofToDelete.panelLayers) {
+        roofToDelete.panelLayers.forEach((p: any) => p.remove());
+      }
+    }
+    setSavedRoofs(prev => prev.filter(r => r.id !== id));
+  };
+
+  // Rinomina il nome dell'area nella tabella laterale
+  const handleRenameRoof = (id: string, newName: string) => {
+    setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
   };
 
   const handleGenerateReport = async () => {
+    if (savedRoofs.length === 0 && currentPoints.length < 3) {
+      alert("Traccia e conferma almeno un'area del tetto prima di procedere.");
+      return;
+    }
+
     let finalRoofs = [...savedRoofs];
     if (currentPoints.length >= 3) {
       const area = calculateAreaInSqm(currentPoints);
-      finalRoofs.push({ id: `roof-last`, points: currentPoints, area });
-      drawPanelsInsidePolygon(currentPoints);
-    }
-
-    if (finalRoofs.length === 0) {
-      alert("Traccia almeno una falda del tetto prima di procedere con l'elaborazione economica.");
-      return;
+      const L = (window as any).L;
+      const panelLayers = generatePanels(currentPoints);
+      const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
+      
+      finalRoofs.push({
+        id: `roof-last`,
+        name: `Area Finale`,
+        points: currentPoints,
+        area,
+        polygonLayer,
+        panelLayers
+      });
     }
 
     const totalArea = finalRoofs.reduce((acc, r) => acc + r.area, 0);
@@ -278,10 +342,12 @@ export default function PvPlanner() {
 
   const handleResetPlanner = () => {
     clearMapPoints();
+    savedRoofs.forEach(r => {
+      if (r.polygonLayer) r.polygonLayer.remove();
+      if (r.panelLayers) r.panelLayers.forEach(p => p.remove());
+    });
     setSavedRoofs([]);
-    savedPolygonsRef.current.forEach(p => p.remove());
-    savedPolygonsRef.current = [];
-    if (panelsLayerGroupRef.current) panelsLayerGroupRef.current.clearLayers();
+    setIsCalculated(false);
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -315,20 +381,60 @@ export default function PvPlanner() {
     <div className="space-y-8">
       <div className="print:hidden">
         <h1 className="text-3xl font-bold tracking-tight text-white">PV Planner Industriale</h1>
-        <p className="text-zinc-400 mt-1">Progetta impianti multiarea su capannoni. Traccia le campate singolarmente, posa i pannelli in 3D e stampa l'offerta.</p>
+        <p className="text-zinc-400 mt-1">Progetta impianti multiarea su capannoni. Traccia le campate, visualizza i moduli e stampa l'offerta.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
         
-        {/* Controlli */}
-        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-5">
+        {/* Barra di comando */}
+        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Cerca Capannone / Sito</label>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Punta il Capannone</label>
             <div className="flex gap-2">
               <input type="text" placeholder="Es: Zona Industriale, Frosinone" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
               <button type="submit" className="bg-zinc-800 border border-zinc-700 px-4 rounded-xl text-white transition">🔍</button>
             </div>
           </form>
+
+          {/* Falda corrente in disegno */}
+          {currentPoints.length > 0 && (
+            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
+              <span className="text-xs font-bold text-white block">Falda in Disegno (In Corso)</span>
+              <p className="text-[11px] text-zinc-400">Segnaposto inseriti: <strong className="text-emerald-400">{currentPoints.length}</strong></p>
+              
+              <div className="flex gap-2">
+                <button onClick={handleUndoLastPoint} className="flex-1 py-2 bg-zinc-700 hover:bg-zinc-650 text-white text-xs font-bold rounded-lg transition">
+                  ↩️ Annulla Punto
+                </button>
+                <button onClick={handleSaveCurrentRoof} className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-lg transition">
+                  ✓ Conferma e Salva Area
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tabella Aree Disegnate Rinominabili */}
+          {savedRoofs.length > 0 && (
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Elenco Aree Capannone</span>
+              <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+                {savedRoofs.map((roof) => (
+                  <div key={roof.id} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 flex items-center justify-between gap-3">
+                    <input 
+                      type="text" 
+                      value={roof.name} 
+                      onChange={(e) => handleRenameRoof(roof.id, e.target.value)}
+                      className="bg-transparent font-bold text-xs text-white border-b border-zinc-700 focus:border-emerald-500 focus:outline-none flex-1 py-0.5"
+                    />
+                    <span className="text-xs text-zinc-400 shrink-0 font-semibold">{Math.round(roof.area)} mq</span>
+                    <button onClick={() => handleDeleteRoof(roof.id)} className="text-red-400 hover:text-red-300 text-xs shrink-0 px-1">
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Configurazione Parametri Economici */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
@@ -372,9 +478,6 @@ export default function PvPlanner() {
           </div>
 
           <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800">
-            <button onClick={handleSaveCurrentRoof} className="w-full py-3 bg-zinc-850 hover:bg-zinc-800 text-white border border-zinc-700 font-bold text-xs rounded-xl transition">
-              💾 Salva Falda Corrente ({savedRoofs.length} salvate)
-            </button>
             <button onClick={handleGenerateReport} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition">
               🚀 Genera Preventivo Totale
             </button>
@@ -384,7 +487,7 @@ export default function PvPlanner() {
           </div>
         </div>
 
-        {/* Mappa */}
+        {/* Contenitore Mappa */}
         <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative">
           <div id="map-pv" className="w-full h-full z-10" />
         </div>
