@@ -10,11 +10,11 @@ interface Coordinate {
 
 interface SavedRoof {
   id: string;
-  name: string; // Campo di testo editabile dall'utente
+  name: string;
   points: Coordinate[];
   area: number;
-  polygonLayer: any; // Riferimento al poligono di Leaflet per poterlo rimuovere
-  panelLayers: any[]; // Riferimento ai pannelli di Leaflet per poterli rimuovere
+  polygonLayer: any;
+  panelLayers: any[];
 }
 
 export default function PvPlanner() {
@@ -23,18 +23,15 @@ export default function PvPlanner() {
   const [loadingGeocode, setLoadingGeocode] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
 
-  // Stato per falde salvate e punti correnti in disegno
   const [savedRoofs, setSavedRoofs] = useState<SavedRoof[]>([]);
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
 
-  // Parametri economici personalizzabili
   const [costPerKwp, setCostPerKwp] = useState(1300); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState(15); 
   const [costPerKwhStorage, setCostPerKwhStorage] = useState(600);
 
-  // Campi output
   const [totalAreaSqm, setTotalAreaSqm] = useState(0);
   const [peakPower, setPeakPower] = useState(0);
   const [annualProduction, setAnnualProduction] = useState(0);
@@ -90,7 +87,6 @@ export default function PvPlanner() {
     const L = (window as any).L;
     if (!L) return;
 
-    // Zoom visivo esteso a 22, maxNativeZoom a 19 per zoom satellitare nitido senza blocchi 401
     const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
     mapRef.current = map;
 
@@ -125,19 +121,15 @@ export default function PvPlanner() {
     });
   };
 
-  // Annulla l'ultimo segnaposto inserito per errore
   const handleUndoLastPoint = () => {
     if (currentPoints.length === 0) return;
     const L = (window as any).L;
 
     setCurrentPoints(prev => {
       const updated = prev.slice(0, -1);
-      
-      // Rimuovi l'ultimo marker visivo
       const lastMarker = activeMarkersRef.current.pop();
       if (lastMarker) lastMarker.remove();
 
-      // Aggiorna o rimuovi il poligono
       if (activePolygonRef.current) {
         if (updated.length >= 3) {
           activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
@@ -150,7 +142,6 @@ export default function PvPlanner() {
     });
   };
 
-  // Pulisce l'area di disegno corrente
   const clearMapPoints = () => {
     setCurrentPoints([]);
     activeMarkersRef.current.forEach(m => m.remove());
@@ -161,52 +152,92 @@ export default function PvPlanner() {
     }
   };
 
-  // Algoritmo di Ray-Casting corretto (X = Longitudine, Y = Latitudine)
-  const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]) => {
-    const x = point.lng;
-    const y = point.lat;
+  // Funzione geometrica di Ray-Casting cartesiana (X = Longitudine, Y = Latitudine)
+  const isPointInPolygonLocal = (point: { x: number; y: number }, polygon: { x: number; y: number }[]) => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].lng;
-      const yi = polygon[i].lat;
-      const xj = polygon[j].lng;
-      const yj = polygon[j].lat;
-      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
       if (intersect) inside = !inside;
     }
     return inside;
   };
 
-  // Calcola e posiziona i moduli reali (1.65m x 1m) all'interno della falda
+  // Algoritmo di Rotazione e Posa dei moduli paralleli al primo lato tracciato (colmo/grondaia)
   const generatePanels = (points: Coordinate[]): any[] => {
     const L = (window as any).L;
     const addedPanels: any[] = [];
     if (!L || points.length < 3) return addedPanels;
 
-    const lats = points.map(p => p.lat);
-    const lngs = points.map(p => p.lng);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
+    // 1. Proiezioni pianeggianti (metri) per evitare distorsioni sferiche
+    const latMid = points[0].lat * Math.PI / 180;
+    const project = (p: Coordinate) => ({
+      x: p.lng * 111320 * Math.cos(latMid),
+      y: p.lat * 110540
+    });
+    const unproject = (m: { x: number; y: number }) => ({
+      lat: m.y / 110540,
+      lng: m.x / (111320 * Math.cos(latMid))
+    });
 
-    const latStep = 0.000015; 
-    const lngStep = 0.000012; 
+    const m0 = project(points[0]);
+    const m1 = project(points[1]);
 
-    for (let lat = minLat; lat < maxLat; lat += latStep) {
-      for (let lng = minLng; lng < maxLng; lng += lngStep) {
-        const center = { lat: lat + latStep / 2, lng: lng + lngStep / 2 };
-        
-        if (isPointInPolygon(center, points)) {
-          const panel = L.rectangle([
-            [lat, lng],
-            [lat + latStep * 0.9, lng + lngStep * 0.9]
-          ], {
-            color: '#1e293b', 
-            fillColor: '#0f172a', 
+    // 2. Calcola l'angolo naturale della prima linea (grondaia)
+    const angleRad = Math.atan2(m1.y - m0.y, m1.x - m0.x);
+
+    // Helpers per ruotare le coordinate cartesiane intorno al baricentro m0
+    const rotate = (p: { x: number; y: number }, rad: number) => ({
+      x: p.x * Math.cos(rad) - p.y * Math.sin(rad),
+      y: p.x * Math.sin(rad) + p.y * Math.cos(rad)
+    });
+
+    // 3. Ruota l'intero poligono del tetto "all'indietro" di -angle per raddrizzarlo
+    const localVertices = points.map(p => {
+      const proj = project(p);
+      const diff = { x: proj.x - m0.x, y: proj.y - m0.y };
+      return rotate(diff, -angleRad);
+    });
+
+    // 4. Trova l'ingombro (Bounding Box) raddrizzato
+    const xs = localVertices.map(v => v.x);
+    const ys = localVertices.map(v => v.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    // Dimensioni dinamiche pescate dalle impostazioni brand
+    const panelWidth = tenant?.panel_width_m || 1.65;
+    const panelHeight = tenant?.panel_height_m || 1.0;
+
+    // 5. Distribuisci la griglia cartesiana sull'area raddrizzata
+    for (let lx = minX; lx < maxX; lx += panelWidth) {
+      for (let ly = minY; ly < maxY; ly += panelHeight) {
+        const center = { x: lx + panelWidth / 2, y: ly + panelHeight / 2 };
+
+        if (isPointInPolygonLocal(center, localVertices)) {
+          // Calcola i 4 angoli del pannello locale
+          const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
+          const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
+          const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
+          const c4 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.95 };
+
+          // Ruota i 4 angoli in avanti (+angle) e convertili in coordinate geografiche reali
+          const geoCorners = [c1, c2, c3, c4].map(c => {
+            const rot = rotate(c, angleRad);
+            return unproject({ x: rot.x + m0.x, y: rot.y + m0.y });
+          });
+
+          // Disegna il pannello inclinato
+          const panel = L.polygon(geoCorners.map(gc => [gc.lat, gc.lng]), {
+            color: '#1e293b',
+            fillColor: '#0f172a',
             fillOpacity: 0.9,
             weight: 1
           }).addTo(mapRef.current);
+
           addedPanels.push(panel);
         }
       }
@@ -230,7 +261,6 @@ export default function PvPlanner() {
     return Math.abs(area / 2);
   };
 
-  // Conferma la falda corrente e la inserisce nella tabella laterale
   const handleSaveCurrentRoof = () => {
     if (currentPoints.length < 3) {
       alert("Definisci almeno 3 segnaposto sulla mappa satellitare prima di salvare l'area.");
@@ -240,10 +270,9 @@ export default function PvPlanner() {
     const area = calculateAreaInSqm(currentPoints);
     const L = (window as any).L;
 
-    // Genera e disegna i pannelli fotovoltaici
+    // Genera e disegna i pannelli orientati
     const panelLayers = generatePanels(currentPoints);
 
-    // Salva il poligono di sfondo
     const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
 
     const index = savedRoofs.length + 1;
@@ -257,10 +286,9 @@ export default function PvPlanner() {
     };
 
     setSavedRoofs(prev => [...prev, newRoof]);
-    clearMapPoints(); // Resetta l'area temporanea per la prossima falda
+    clearMapPoints();
   };
 
-  // Rimuove una falda specifica cancellando i disegni dalla mappa satellitare
   const handleDeleteRoof = (id: string) => {
     const roofToDelete = savedRoofs.find(r => r.id === id);
     if (roofToDelete) {
@@ -272,7 +300,6 @@ export default function PvPlanner() {
     setSavedRoofs(prev => prev.filter(r => r.id !== id));
   };
 
-  // Rinomina il nome dell'area nella tabella laterale
   const handleRenameRoof = (id: string, newName: string) => {
     setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
   };
@@ -381,12 +408,12 @@ export default function PvPlanner() {
     <div className="space-y-8">
       <div className="print:hidden">
         <h1 className="text-3xl font-bold tracking-tight text-white">PV Planner Industriale</h1>
-        <p className="text-zinc-400 mt-1">Progetta impianti multiarea su capannoni. Traccia le campate, visualizza i moduli e stampa l'offerta.</p>
+        <p className="text-zinc-400 mt-1">Progetta impianti multiarea su capannoni. Traccia le campate, visualizza i moduli inclinati e stampa l'offerta.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
         
-        {/* Barra di comando */}
+        {/* Controlli */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Punta il Capannone</label>
@@ -396,7 +423,7 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Falda corrente in disegno */}
+          {/* Falda in disegno */}
           {currentPoints.length > 0 && (
             <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
               <span className="text-xs font-bold text-white block">Falda in Disegno (In Corso)</span>
@@ -404,16 +431,16 @@ export default function PvPlanner() {
               
               <div className="flex gap-2">
                 <button onClick={handleUndoLastPoint} className="flex-1 py-2 bg-zinc-700 hover:bg-zinc-650 text-white text-xs font-bold rounded-lg transition">
-                  ↩️ Annulla Punto
+                  Annulla Punto
                 </button>
                 <button onClick={handleSaveCurrentRoof} className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-lg transition">
-                  ✓ Conferma e Salva Area
+                  Salva Falda Corrente
                 </button>
               </div>
             </div>
           )}
 
-          {/* Tabella Aree Disegnate Rinominabili */}
+          {/* Tabella Aree */}
           {savedRoofs.length > 0 && (
             <div className="space-y-3">
               <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Elenco Aree Capannone</span>
@@ -493,7 +520,7 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Output del Preventivo e foglio di stampa A4 */}
+      {/* Output del Preventivo */}
       {isCalculated && (
         <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-8 print:bg-white print:text-black print:border-0 print:p-0 animate-fadeIn">
           
