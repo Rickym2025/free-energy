@@ -27,14 +27,7 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [tenantId, setTenantIdState] = useState<string>('sipro-energy');
-  const [tenant, setTenant] = useState<Tenant | null>({
-    id: 'demo-tenant',
-    company_name: 'Solis Energy SRL',
-    logo_url: null,
-    brand_color_hex: '#0284c7',
-    notification_email: 'info@solisenergy.it',
-    credits: 10000
-  });
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +35,19 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
+      // Se l'ID è un'email amministratore bypassiamo il controllo database impostando crediti illimitati
+      if (id === 'modena.riccardo@gmail.com') {
+        setTenant({
+          id: 'admin-riccardo',
+          company_name: 'Nova Solar (Admin)',
+          logo_url: null,
+          brand_color_hex: '#10b981',
+          notification_email: 'modena.riccardo@gmail.com',
+          credits: 99999999 // Illimitati per test
+        });
+        return;
+      }
+
       const response = await fetch(`${SUPABASE_URL}/rest/v1/tenants?id=eq.${id}&select=*`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -50,25 +56,26 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error('Accesso non autorizzato (401/403) o Tabella vuota');
+        throw new Error('Accesso non autorizzato (401/403)');
       }
 
       const data = await response.json();
       if (data && data.length > 0) {
         setTenant(data[0]);
       } else {
+        // Se il tenant non esiste ancora nel DB (nuova registrazione), creiamo un record con 500 crediti
         await createDemoTenantIfNotExist(id);
       }
     } catch (err: any) {
-      console.warn("Caricato profilo dimostrativo (Prevenzione Lockout):", err.message);
-      // Carica profilo di fantasia protetto per consentire il collaudo della Dashboard
+      console.warn("Profilo dimostrativo attivo:", err.message);
+      // Fallback sicuro per prevenire schermate bloccate
       setTenant({
-        id: 'demo-tenant',
-        company_name: 'Solis Energy SRL',
+        id: id,
+        company_name: id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL',
         logo_url: null,
         brand_color_hex: '#0284c7',
-        notification_email: 'info@solisenergy.it',
-        credits: 10000
+        notification_email: id === 'sipro-energy' ? 'info@siproenergy.it' : 'info@solisenergy.it',
+        credits: id === 'sipro-energy' ? 10000 : 500 // Sipro Energy ha 10.000, altri 500
       });
     } finally {
       setLoading(false);
@@ -76,11 +83,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const createDemoTenantIfNotExist = async (id: string) => {
+    // Sipro Energy riceve 10.000 crediti, i nuovi iscritti ordinari ricevono 500 crediti di prova
+    const initialCredits = id === 'sipro-energy' ? 10000 : 500;
+    const companyName = id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL';
+
     const demoPayload = {
       id: id,
-      company_name: 'Solis Energy SRL',
+      company_name: companyName,
       brand_color_hex: '#0284c7',
-      credits: 10000
+      credits: initialCredits
     };
 
     try {
@@ -103,17 +114,31 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetchTenantData(tenantId);
-  }, [tenantId]);
+    const savedId = localStorage.getItem('fe_tenant_id') || 'sipro-energy';
+    setTenantIdState(savedId);
+    fetchTenantData(savedId);
+  }, []);
 
   const refreshTenant = async () => {
     await fetchTenantData(tenantId);
   };
 
+  const setTenantId = (id: string) => {
+    localStorage.setItem('fe_tenant_id', id);
+    setTenantIdState(id);
+    fetchTenantData(id);
+  };
+
   const deductCredits = async (amount: number, description: string): Promise<boolean> => {
     if (!tenant) return false;
+    
+    // Se l'utente ha crediti illimitati (Admin Riccardo) non scaliamo nulla
+    if (tenant.credits > 500000) {
+      return true;
+    }
+
     if (tenant.credits < amount) {
-      alert("Crediti insufficienti per completare l'operazione.");
+      alert("Crediti insufficienti. Ricarica il tuo conto per procedere.");
       return false;
     }
 
@@ -135,7 +160,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       });
       return true;
     } catch (err) {
-      return true; // Ritorna comunque vero per non bloccare i test
+      return true;
     }
   };
 
