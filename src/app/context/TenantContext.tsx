@@ -12,6 +12,8 @@ export interface Tenant {
   brand_color_hex: string;
   notification_email: string | null;
   credits: number;
+  panel_width_m: number;  // Aggiunto per CAD rotazione
+  panel_height_m: number; // Aggiunto per CAD rotazione
 }
 
 interface TenantContextType {
@@ -35,7 +37,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      // Se l'ID è un'email amministratore bypassiamo il controllo database impostando crediti illimitati
       if (id === 'modena.riccardo@gmail.com') {
         setTenant({
           id: 'admin-riccardo',
@@ -43,7 +44,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           logo_url: null,
           brand_color_hex: '#10b981',
           notification_email: 'modena.riccardo@gmail.com',
-          credits: 99999999 // Illimitati per test
+          credits: 99999999,
+          panel_width_m: 1.65,
+          panel_height_m: 1.0
         });
         return;
       }
@@ -61,21 +64,25 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
       if (data && data.length > 0) {
-        setTenant(data[0]);
+        setTenant({
+          ...data[0],
+          panel_width_m: data[0].panel_width_m || 1.65,
+          panel_height_m: data[0].panel_height_m || 1.0
+        });
       } else {
-        // Se il tenant non esiste ancora nel DB (nuova registrazione), creiamo un record con 500 crediti
         await createDemoTenantIfNotExist(id);
       }
     } catch (err: any) {
       console.warn("Profilo dimostrativo attivo:", err.message);
-      // Fallback sicuro per prevenire schermate bloccate
       setTenant({
         id: id,
         company_name: id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL',
         logo_url: null,
         brand_color_hex: '#0284c7',
         notification_email: id === 'sipro-energy' ? 'info@siproenergy.it' : 'info@solisenergy.it',
-        credits: id === 'sipro-energy' ? 10000 : 500 // Sipro Energy ha 10.000, altri 500
+        credits: id === 'sipro-energy' ? 10000 : 500,
+        panel_width_m: 1.65,
+        panel_height_m: 1.0
       });
     } finally {
       setLoading(false);
@@ -83,7 +90,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   };
 
   const createDemoTenantIfNotExist = async (id: string) => {
-    // Sipro Energy riceve 10.000 crediti, i nuovi iscritti ordinari ricevono 500 crediti di prova
     const initialCredits = id === 'sipro-energy' ? 10000 : 500;
     const companyName = id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL';
 
@@ -91,7 +97,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       id: id,
       company_name: companyName,
       brand_color_hex: '#0284c7',
-      credits: initialCredits
+      credits: initialCredits,
+      panel_width_m: 1.65,
+      panel_height_m: 1.0
     };
 
     try {
@@ -106,7 +114,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const created = await res.json();
-        if (created && created.length > 0) setTenant(created[0]);
+        if (created && created.length > 0) {
+          setTenant({
+            ...created[0],
+            panel_width_m: created[0].panel_width_m || 1.65,
+            panel_height_m: created[0].panel_height_m || 1.0
+          });
+        }
       }
     } catch (e) {
       console.error(e);
@@ -132,13 +146,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const deductCredits = async (amount: number, description: string): Promise<boolean> => {
     if (!tenant) return false;
     
-    // Se l'utente ha crediti illimitati (Admin Riccardo) non scaliamo nulla
     if (tenant.credits > 500000) {
       return true;
     }
 
     if (tenant.credits < amount) {
-      alert("Crediti insufficienti. Ricarica il tuo conto per procedere.");
+      alert("Crediti insufficienti.");
       return false;
     }
 
