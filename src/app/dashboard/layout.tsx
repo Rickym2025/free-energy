@@ -33,6 +33,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    // Inietta stili per nascondere totalmente la barra di scorrimento orizzontale sui chip su tutti i browser
+    const styleSheet = document.createElement("style");
+    styleSheet.innerHTML = `
+      .no-scrollbar::-webkit-scrollbar { display: none !important; }
+      .no-scrollbar { -ms-overflow-style: none !important; scrollbar-width: none !important; }
+    `;
+    document.head.appendChild(styleSheet);
+    return () => styleSheet.remove();
+  }, []);
+
   const sendChatMessage = async (textOverride?: string) => {
     const text = (textOverride || inputValue).trim();
     if (!text) return;
@@ -121,10 +132,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Chatbot Galleggiante Giulia AI */}
+      {/* Chatbot Galleggiante Giulia AI (Larghezza 380px, Altezza 540px) */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
         {chatOpen && (
-          <div className="w-80 h-96 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
+          <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
             <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
@@ -132,6 +143,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               </div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white text-lg">✕</button>
             </div>
+            
+            {/* Corpo dei messaggi */}
             <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-zinc-900/60 scrollbar-none">
               {messages.map((m) => (
                 <div key={m.id} className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${m.sender === 'user' ? 'bg-emerald-500 text-zinc-950 ml-auto rounded-br-none' : 'bg-zinc-800 text-zinc-300 mr-auto rounded-bl-none'}`}>
@@ -142,15 +155,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <div ref={messagesEndRef} />
             </div>
             
-            <div className="px-4 py-2 bg-zinc-900 flex gap-1.5 overflow-x-auto scrollbar-none border-t border-zinc-850">
-              <button onClick={() => sendChatMessage("Come uso il PV Planner?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">🛰️ PV Planner</button>
-              <button onClick={() => sendChatMessage("Come si caricano i CV?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">📄 Valutazione CV</button>
-              <button onClick={() => sendChatMessage("Dove trovo il widget per il sito?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">🔌 Codice Widget</button>
+            {/* Chips di selezione rapida (Senza barre di scorrimento) */}
+            <div className="px-4 py-2.5 bg-zinc-900 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-zinc-850">
+              <button onClick={() => sendChatMessage("Come uso il PV Planner?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium">🛰️ PV Planner</button>
+              <button onClick={() => sendChatMessage("Come si caricano i CV?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium">📄 Valutazione CV</button>
+              <button onClick={() => sendChatMessage("Dove trovo il widget per il sito?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium">🔌 Codice Widget</button>
             </div>
 
             <div className="p-3 bg-zinc-950 border-t border-zinc-800 flex gap-2">
-              <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()} placeholder="Fai una domanda..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500" />
-              <button onClick={() => sendChatMessage()} className="bg-emerald-500 text-zinc-950 font-bold px-3 py-2 rounded-lg text-xs">Invia</button>
+              <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()} placeholder="Fai una domanda..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500" />
+              <button onClick={() => sendChatMessage()} className="bg-emerald-500 text-zinc-950 font-bold px-4 py-2.5 rounded-lg text-xs">Invia</button>
             </div>
           </div>
         )}
