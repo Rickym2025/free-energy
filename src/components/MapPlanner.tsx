@@ -11,7 +11,7 @@ interface MapPlannerProps {
   brandColor: string;
   panelWidth: number;
   panelHeight: number;
-  panelRotation: number; // Angolo dello slider (0-360)
+  panelRotation: number;
   currentPoints: Coordinate[];
   savedRoofs: any[];
   onMapClick: (point: Coordinate) => void;
@@ -31,12 +31,14 @@ export default function MapPlanner({
   const mapRef = useRef<any>(null);
   const activeMarkersRef = useRef<any[]>([]);
   const activePolygonRef = useRef<any>(null);
+  
+  // LayerGroup per contenere ed eliminare dinamicamente tetti e pannelli
+  const savedRoofsLayerGroupRef = useRef<any>(null);
   const panelsLayerGroupRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Forza il mirino a croce su ogni singolo elemento interattivo di Leaflet
     const styleEl = document.createElement('style');
     styleEl.innerHTML = `
       .leaflet-container, 
@@ -69,12 +71,22 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Ridisegna i pannelli in tempo reale ogni volta che l'utente sposta lo slider di rotazione
+  // Aggiorna reattivamente sia i tetti che i pannelli ogni volta che cambia lo stato o lo slider
   useEffect(() => {
-    if (panelsLayerGroupRef.current) {
-      panelsLayerGroupRef.current.clearLayers();
-    }
+    const L = (window as any).L;
+    if (!L || !mapRef.current) return;
+
+    if (savedRoofsLayerGroupRef.current) savedRoofsLayerGroupRef.current.clearLayers();
+    if (panelsLayerGroupRef.current) panelsLayerGroupRef.current.clearLayers();
+
     savedRoofs.forEach(roof => {
+      // 1. Ridisegna il poligono di sfondo del tetto
+      L.polygon(roof.points.map((p: Coordinate) => [p.lat, p.lng]), {
+        color: '#10b981',
+        fillOpacity: 0.25
+      }).addTo(savedRoofsLayerGroupRef.current);
+
+      // 2. Ridisegna i pannelli orientati all'interno
       drawPanelsForRoof(roof.points, roof.id);
     });
   }, [panelRotation, savedRoofs]);
@@ -84,7 +96,6 @@ export default function MapPlanner({
     const L = (window as any).L;
     if (!L || !mapRef.current) return;
 
-    // Pulisci i vecchi marker temporanei
     activeMarkersRef.current.forEach(m => m.remove());
     activeMarkersRef.current = [];
 
@@ -116,6 +127,7 @@ export default function MapPlanner({
       attribution: 'Esri, Maxar'
     }).addTo(map);
 
+    savedRoofsLayerGroupRef.current = L.layerGroup().addTo(map);
     panelsLayerGroupRef.current = L.layerGroup().addTo(map);
 
     map.on('click', (e: any) => {
@@ -132,7 +144,7 @@ export default function MapPlanner({
     const unproject = (m: { x: number; y: number }) => ({ lat: m.y / 110540, lng: m.x / (111320 * Math.cos(latMid)) });
 
     const m0 = project(points[0]);
-    const angleRad = (panelRotation * Math.PI) / 180; // Utilizza l'inclinazione dello slider manuale
+    const angleRad = (panelRotation * Math.PI) / 180; 
 
     const rotate = (p: { x: number; y: number }, rad: number) => ({
       x: p.x * Math.cos(rad) - p.y * Math.sin(rad),
@@ -173,7 +185,6 @@ export default function MapPlanner({
             weight: 1
           }).addTo(panelsLayerGroupRef.current);
 
-          // Cliccando sul pannello, scompare dalla mappa e si aggiorna il totale
           panel.on('click', (e: any) => {
             L.DomEvent.stopPropagation(e);
             panel.remove();
