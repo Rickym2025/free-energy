@@ -14,10 +14,16 @@ export default function PvPlanner() {
   const [loadingGeocode, setLoadingGeocode] = useState(false);
   const [coords, setCoords] = useState<Coordinate | null>(null);
   const [polygonPoints, setPolygonPoints] = useState<Coordinate[]>([]);
-  const [calculatedArea, setCalculatedArea] = useState<number | null>(null);
-  const [pvgisData, setPvgisData] = useState<any | null>(null);
-  const [monthlyBill, setMonthlyBill] = useState('150');
   const [isCalculated, setIsCalculated] = useState(false);
+
+  // Campi di output EDITABILI dall'utente per personalizzare il report finale
+  const [areaSqm, setAreaSqm] = useState(0);
+  const [peakPower, setPeakPower] = useState(0);
+  const [annualProduction, setAnnualProduction] = useState(0);
+  const [annualSavings, setAnnualSavings] = useState(0);
+  const [estimatedCost, setEstimatedCost] = useState(5500); // Costo manuale impostabile
+
+  const [monthlyBill, setMonthlyBill] = useState('150');
 
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -84,8 +90,6 @@ export default function PvPlanner() {
 
   const clearMapPoints = () => {
     setPolygonPoints([]);
-    setCalculatedArea(null);
-    setPvgisData(null);
     setIsCalculated(false);
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
@@ -143,10 +147,11 @@ export default function PvPlanner() {
     }
 
     const area = calculateAreaInSqm(polygonPoints);
-    setCalculatedArea(area);
+    setAreaSqm(area);
     const estimPeakPower = (area / 1.65) * 0.43;
+    setPeakPower(estimPeakPower);
 
-    const success = await deductCredits(150, `Elaborazione Report Solare Satellitare: ${address || 'Coordinate personalizzate'}`);
+    const success = await deductCredits(150, `Elaborazione Report Solare: ${address}`);
     if (!success) return;
 
     setLoadingGeocode(true);
@@ -154,88 +159,65 @@ export default function PvPlanner() {
       const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${polygonPoints[0].lat}&lon=${polygonPoints[0].lng}&peakpower=${estimPeakPower.toFixed(2)}&loss=14&outputformat=json`;
       const response = await fetch(pvgisUrl);
       const data = await response.json();
-      setPvgisData(data);
+      const productionVal = data.outputs?.totals?.fixed?.E_y || (estimPeakPower * 1350);
+      setAnnualProduction(productionVal);
+      setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, productionVal * 0.25));
+      setEstimatedCost(Math.round(estimPeakPower * 1200)); // Costo medio indicativo
       setIsCalculated(true);
     } catch (err) {
       const localProductionEstimate = estimPeakPower * 1350;
-      setPvgisData({
-        outputs: { totals: { fixed: { E_y: localProductionEstimate } } }
-      });
+      setAnnualProduction(localProductionEstimate);
+      setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, localProductionEstimate * 0.25));
+      setEstimatedCost(Math.round(estimPeakPower * 1200));
       setIsCalculated(true);
     } finally {
       setLoadingGeocode(false);
     }
   };
 
-  const annualProduction = pvgisData?.outputs?.totals?.fixed?.E_y || 0;
-  const estimatedPower = (calculatedArea ? (calculatedArea / 1.65) * 0.43 : 0);
-  const panelCount = calculatedArea ? Math.floor(calculatedArea / 1.65) : 0;
-  const annualBillSavings = Math.min(parseFloat(monthlyBill) * 12 * 0.85, annualProduction * 0.25);
-
   return (
     <div className="space-y-8">
-      <div>
+      <div className="print:hidden">
         <h1 className="text-3xl font-bold tracking-tight text-white">PV Planner</h1>
-        <p className="text-zinc-400 mt-1">Trova l'indirizzo e disegna la falda del tetto per calcolare la produzione teorica di energia.</p>
+        <p className="text-zinc-400 mt-1">Traccia la falda del tetto e personalizza il preventivo grafico per il tuo cliente prima di scaricarlo.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
         
-        {/* Pannello Input (Grigio solido standard per evitare testi bianchi su sfondo bianco) */}
+        {/* Pannello di Input */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Cerca Indirizzo</label>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center">
+              Cerca Indirizzo
+              <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-center text-xs text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition duration-150">
+                  Inserisci la via, il civico e il comune per puntare il satellite.
+                </span>
+              </span>
+            </label>
             <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="Es: Via Roma 10, Milano" 
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-              />
-              <button 
-                type="submit" 
-                disabled={loadingGeocode}
-                className="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 px-4 rounded-xl text-white transition disabled:opacity-50"
-              >
-                🔍
-              </button>
+              <input type="text" placeholder="Es: Via Roma 10, Milano" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
+              <button type="submit" disabled={loadingGeocode} className="bg-zinc-800 border border-zinc-700 px-4 rounded-xl text-white transition">🔍</button>
             </div>
           </form>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Spesa Energetica Mensile (€)</label>
-            <input 
-              type="number" 
-              value={monthlyBill}
-              onChange={(e) => setMonthlyBill(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="bg-zinc-800 border border-zinc-700 p-4 rounded-xl space-y-3">
-            <span className="text-xs font-bold text-zinc-300 block">Istruzioni d'Uso:</span>
-            <ul className="text-xs text-zinc-400 space-y-2 list-disc pl-4">
-              <li>Cerca l'indirizzo della casa.</li>
-              <li>Fai clic sulla mappa per inserire i vertici del tetto.</li>
-              <li>Fai clic su "Elabora Report" (Costo: 150 crediti).</li>
-            </ul>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center">
+              Spesa Mensile (€)
+              <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-center text-xs text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition duration-150">
+                  La bolletta mensile media del cliente per stimare il risparmio finanziario dell'impianto.
+                </span>
+              </span>
+            </label>
+            <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
           </div>
 
           <div className="flex flex-col gap-3">
-            <button 
-              onClick={handleGenerateReport}
-              disabled={polygonPoints.length < 3 || isCalculated}
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition"
-            >
-              🚀 Elabora Report (150 crediti)
-            </button>
-            <button 
-              onClick={clearMapPoints}
-              className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl text-sm transition"
-            >
-              Annulla Tracciamento
-            </button>
+            <button onClick={handleGenerateReport} disabled={polygonPoints.length < 3 || isCalculated} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">🚀 Elabora Preventivo (150 crediti)</button>
+            <button onClick={clearMapPoints} className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl text-sm transition">Reset Mappa</button>
           </div>
         </div>
 
@@ -245,25 +227,56 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Output */}
+      {/* Output / Anteprima Preventivo EDITABILE */}
       {isCalculated && (
-        <div className="bg-zinc-900 border border-emerald-500/30 p-8 rounded-2xl grid grid-cols-1 md:grid-cols-4 gap-6 animate-fadeIn">
-          <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
-            <span className="text-xs text-zinc-400 font-semibold block uppercase">Superficie Misurata</span>
-            <span className="text-3xl font-bold text-white mt-2 block">{calculatedArea?.toFixed(1)} mq</span>
+        <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-6 print:bg-white print:text-black print:border-0 print:p-0">
+          
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-4 print:border-zinc-300">
+            <div>
+              <h2 className="text-2xl font-black text-white print:text-black">Studio di Fattibilità Preliminare</h2>
+              <p className="text-xs text-zinc-400 print:text-zinc-600 mt-1">Elaborato per l'indirizzo: {address || "Coordinate satellite"}</p>
+            </div>
+            <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest print:hidden">Preventivo Modificabile</span>
           </div>
-          <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
-            <span className="text-xs text-zinc-400 font-semibold block uppercase">Potenza Stimata</span>
-            <span className="text-3xl font-bold text-emerald-400 mt-2 block">{estimatedPower.toFixed(2)} kWp</span>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            
+            <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700 print:bg-zinc-100 print:border-zinc-300">
+              <label className="text-xs text-zinc-400 print:text-zinc-600 font-semibold uppercase block">Superficie (mq)</label>
+              <input type="number" value={areaSqm.toFixed(1)} onChange={(e) => setAreaSqm(parseFloat(e.target.value) || 0)} className="bg-transparent text-3xl font-bold text-white print:text-black focus:outline-none w-full border-b border-dashed border-zinc-700 focus:border-emerald-500 mt-2" />
+            </div>
+
+            <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700 print:bg-zinc-100 print:border-zinc-300">
+              <label className="text-xs text-zinc-400 print:text-zinc-600 font-semibold uppercase block">Potenza (kWp)</label>
+              <input type="number" step="0.1" value={peakPower.toFixed(2)} onChange={(e) => setPeakPower(parseFloat(e.target.value) || 0)} className="bg-transparent text-3xl font-bold text-emerald-400 print:text-emerald-700 focus:outline-none w-full border-b border-dashed border-zinc-700 focus:border-emerald-500 mt-2" />
+            </div>
+
+            <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700 print:bg-zinc-100 print:border-zinc-300">
+              <label className="text-xs text-zinc-400 print:text-zinc-600 font-semibold uppercase block">Produzione (kWh)</label>
+              <input type="number" value={Math.round(annualProduction)} onChange={(e) => setAnnualProduction(parseFloat(e.target.value) || 0)} className="bg-transparent text-3xl font-bold text-white print:text-black focus:outline-none w-full border-b border-dashed border-zinc-700 focus:border-emerald-500 mt-2" />
+            </div>
+
+            <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700 print:bg-zinc-100 print:border-zinc-300">
+              <label className="text-xs text-zinc-400 print:text-zinc-600 font-semibold uppercase block">Risparmio (€/anno)</label>
+              <input type="number" value={Math.round(annualSavings)} onChange={(e) => setAnnualSavings(parseFloat(e.target.value) || 0)} className="bg-transparent text-3xl font-bold text-emerald-400 print:text-emerald-700 focus:outline-none w-full border-b border-dashed border-zinc-700 focus:border-emerald-500 mt-2" />
+            </div>
+
+            <div className="bg-zinc-850 p-6 rounded-2xl border border-zinc-700 print:bg-zinc-100 print:border-zinc-300">
+              <label className="text-xs text-zinc-400 print:text-zinc-600 font-semibold uppercase block">Costo Impianto (€)</label>
+              <input type="number" value={estimatedCost} onChange={(e) => setEstimatedCost(parseFloat(e.target.value) || 0)} className="bg-transparent text-3xl font-bold text-white print:text-black focus:outline-none w-full border-b border-dashed border-zinc-700 focus:border-emerald-500 mt-2" />
+            </div>
+
           </div>
-          <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
-            <span className="text-xs text-zinc-400 font-semibold block uppercase">Produzione Annua</span>
-            <span className="text-3xl font-bold text-white mt-2 block">{Math.round(annualProduction).toLocaleString()} kWh</span>
+
+          <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:border-zinc-300">
+            <span className="text-xs text-zinc-500 print:text-zinc-600">
+              *Puoi modificare liberamente i valori delle celle se desideri allineare i dati alle preferenze commerciali del cliente.
+            </span>
+            <button onClick={() => window.print()} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition print:hidden">
+              🖨️ Stampa / Esporta PDF
+            </button>
           </div>
-          <div className="bg-zinc-850 p-6 rounded-xl border border-zinc-700">
-            <span className="text-xs text-zinc-400 font-semibold block uppercase">Risparmio Stimato</span>
-            <span className="text-3xl font-bold text-emerald-400 mt-2 block">~ € {Math.round(annualBillSavings).toLocaleString()}</span>
-          </div>
+
         </div>
       )}
     </div>
