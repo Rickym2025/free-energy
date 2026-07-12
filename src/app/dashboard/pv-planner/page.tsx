@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useTenant } from '@/context/TenantContext';
+import { useTenant } from '@/app/context/TenantContext';
 
 interface Coordinate {
   lat: number;
