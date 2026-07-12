@@ -21,7 +21,6 @@ interface SavedRoof {
 export default function PvPlanner() {
   const { tenant, deductCredits } = useTenant();
   
-  // Dichiarazione all'inizio per garantire l'ambito di visibilità in tutto il componente
   const brandColor = tenant?.brand_color_hex || '#0284c7';
 
   const [address, setAddress] = useState('');
@@ -140,85 +139,6 @@ export default function PvPlanner() {
     }
   };
 
-  // Genera ed associa i moduli inclinati e cliccabili per la rimozione ostacoli
-  const generatePanels = (points: Coordinate[], roofId: string): any[] => {
-    const L = (window as any).L;
-    const addedPanels: any[] = [];
-    if (!L || points.length < 3) return addedPanels;
-
-    const latMid = points[0].lat * Math.PI / 180;
-    const project = (p: Coordinate) => ({ x: p.lng * 111320 * Math.cos(latMid), y: p.lat * 110540 });
-    const unproject = (m: { x: number; y: number }) => ({ lat: m.y / 110540, lng: m.x / (111320 * Math.cos(latMid)) });
-
-    const m0 = project(points[0]);
-    const m1 = project(points[1]);
-    const angleRad = (panelRotation * Math.PI) / 180; 
-
-    const rotate = (p: { x: number; y: number }, rad: number) => ({
-      x: p.x * Math.cos(rad) - p.y * Math.sin(rad),
-      y: p.x * Math.sin(rad) + p.y * Math.cos(rad)
-    });
-
-    const localVertices = points.map(p => {
-      const proj = project(p);
-      return rotate({ x: proj.x - m0.x, y: proj.y - m0.y }, -angleRad);
-    });
-
-    const xs = localVertices.map(v => v.x);
-    const ys = localVertices.map(v => v.y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-
-    const panelWidth = tenant?.panel_width_m || 1.65;
-    const panelHeight = tenant?.panel_height_m || 1.0;
-
-    for (let lx = minX; lx < maxX; lx += panelWidth) {
-      for (let ly = minY; ly < maxY; ly += panelHeight) {
-        const center = { x: lx + panelWidth / 2, y: ly + panelHeight / 2 };
-
-        const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
-        const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
-        const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
-        const c4 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.95 };
-
-        if (
-          isPointInPolygonLocal(c1, localVertices) &&
-          isPointInPolygonLocal(c2, localVertices) &&
-          isPointInPolygonLocal(c3, localVertices) &&
-          isPointInPolygonLocal(c4, localVertices)
-        ) {
-          const geoCorners = [c1, c2, c3, c4].map(c => {
-            const rot = rotate(c, angleRad);
-            return unproject({ x: rot.x + m0.x, y: rot.y + m0.y });
-          });
-
-          const panel = L.polygon(geoCorners.map(gc => [gc.lat, gc.lng]), {
-            color: '#1e293b',
-            fillColor: '#0f172a',
-            fillOpacity: 0.9,
-            weight: 1
-          }).addTo(mapRef.current);
-
-          panel.on('click', (e: any) => {
-            L.DomEvent.stopPropagation(e);
-            panel.remove();
-            setSavedRoofs(prev => prev.map(r => {
-              if (r.id === roofId) {
-                return { 
-                  ...r, 
-                  panelCount: Math.max(0, r.panelCount - 1)
-                };
-              }
-              return r;
-            }));
-          });
-
-          addedPanels.push(panel);
-        }
-      }
-    }
-    return addedPanels;
-  };
-
   const handleSaveCurrentRoof = () => {
     if (currentPoints.length < 3) {
       alert("Definisci almeno 3 segnaposto sulla mappa satellitare prima di salvare l'area.");
@@ -228,32 +148,33 @@ export default function PvPlanner() {
     const area = calculateAreaInSqm(currentPoints);
     const roofId = `roof-${Date.now()}`;
 
-    const panelLayers = generatePanels(currentPoints, roofId);
-    const L = (window as any).L;
-    const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: brandColor, fillOpacity: 0.35 }).addTo(mapRef.current);
+    // Calcolo geometrico del numero reale di pannelli validi inseriti dentro la falda (White-label)
+    const pWidth = tenant?.panel_width_m || 1.65;
+    const pHeight = tenant?.panel_height_m || 1.0;
+    const panelCount = calculatePanelCount(currentPoints, pWidth, pHeight, panelRotation);
 
     const newRoof: SavedRoof = {
       id: roofId,
       name: `Area Tetto #${savedRoofs.length + 1}`,
       points: currentPoints,
       area,
-      polygonLayer,
-      panelLayers,
-      panelCount: panelLayers.length
+      panelCount
     };
 
     setSavedRoofs(prev => [...prev, newRoof]);
     clearMapPoints();
   };
 
-  const handleDeleteRoof = (id: string) => {
-    const roofToDelete = savedRoofs.find(r => r.id === id);
-    if (roofToDelete) {
-      if (roofToDelete.polygonLayer) roofToDelete.polygonLayer.remove();
-      if (roofToDelete.panelLayers) {
-        roofToDelete.panelLayers.forEach((p: any) => p.remove());
+  const handlePanelDeleted = (roofId: string) => {
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === roofId) {
+        return { ...r, panelCount: Math.max(0, r.panelCount - 1) };
       }
-    }
+      return r;
+    }));
+  };
+
+  const handleDeleteRoof = (id: string) => {
     setSavedRoofs(prev => prev.filter(r => r.id !== id));
   };
 
@@ -304,10 +225,6 @@ export default function PvPlanner() {
 
   const handleResetPlanner = () => {
     clearMapPoints();
-    savedRoofs.forEach(r => {
-      if (r.polygonLayer) r.polygonLayer.remove();
-      if (r.panelLayers) r.panelLayers.forEach(p => p.remove());
-    });
     setSavedRoofs([]);
     setIsCalculated(false);
   };
@@ -355,8 +272,8 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Slider di rotazione manuale e precisissimo */}
-          <div className="bg-zinc-805 p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
+          {/* Slider di rotazione manuale */}
+          <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
               <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
@@ -417,11 +334,11 @@ export default function PvPlanner() {
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-700">
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Capacità (kWh)</label>
-                      <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-750 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
+                      <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
                     </div>
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Costo/kWh (€)</label>
-                      <input type="number" value={costPerKwhStorage} onChange={(e) => setCostPerKwhStorage(parseInt(e.target.value) || 0)} className="w-full bg-zinc-750 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
+                      <input type="number" value={costPerKwhStorage} onChange={(e) => setCostPerKwhStorage(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
                     </div>
                   </div>
                 )}
@@ -486,6 +403,53 @@ function calculateAreaInSqm(points: Coordinate[]) {
     area += meters[i].x * meters[j].y - meters[j].x * meters[i].y;
   }
   return Math.abs(area / 2);
+}
+
+// Calcolatore geometrico parallelo ed autonomo lato client per stimare i moduli senza dipendenze Leaflet
+function calculatePanelCount(points: Coordinate[], panelWidth: number, panelHeight: number, rotation: number): number {
+  if (points.length < 3) return 0;
+
+  const latMid = points[0].lat * Math.PI / 180;
+  const project = (p: Coordinate) => ({ x: p.lng * 111320 * Math.cos(latMid), y: p.lat * 110540 });
+
+  const m0 = project(points[0]);
+  const m1 = project(points[1]);
+  const angleRad = (rotation * Math.PI) / 180;
+
+  const rotate = (p: { x: number; y: number }, rad: number) => ({
+    x: p.x * Math.cos(rad) - p.y * Math.sin(rad),
+    y: p.x * Math.sin(rad) + p.y * Math.cos(rad)
+  });
+
+  const localVertices = points.map(p => {
+    const proj = project(p);
+    return rotate({ x: proj.x - m0.x, y: proj.y - m0.y }, -angleRad);
+  });
+
+  const xs = localVertices.map(v => v.x);
+  const ys = localVertices.map(v => v.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  let count = 0;
+
+  for (let lx = minX; lx < maxX; lx += panelWidth) {
+    for (let ly = minY; ly < maxY; ly += panelHeight) {
+      const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
+      const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
+      const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
+      const c4 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.95 };
+
+      if (
+        isPointInPolygonLocal(c1, localVertices) &&
+        isPointInPolygonLocal(c2, localVertices) &&
+        isPointInPolygonLocal(c3, localVertices) &&
+        isPointInPolygonLocal(c4, localVertices)
+      ) {
+        count++;
+      }
+    }
+  }
+  return count;
 }
 
 function isPointInPolygonLocal(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
