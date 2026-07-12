@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TenantProvider, useTenant } from '@/context/TenantContext';
+import { TenantProvider, useTenant } from '@/app/context/TenantContext';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
