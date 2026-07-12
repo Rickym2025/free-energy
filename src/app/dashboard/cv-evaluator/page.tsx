@@ -8,7 +8,7 @@ interface Candidate {
   candidate_name: string;
   applied_role: string;
   cv_file_url: string;
-  score: number;
+  score: number; // Memorizza il valore (20, 40, 60, 80, 100) per rappresentare le stelle (1-5)
   ai_analysis_json: {
     strengths: string[];
     weaknesses: string[];
@@ -29,11 +29,11 @@ export default function CvEvaluator() {
   const [loading, setLoading] = useState(true);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
 
-  // States per scraping annuncio ed analisi CV
+  // Input per lo screening
   const [jobUrl, setJobUrl] = useState('');
   const [isScraping, setIsScraping] = useState(false);
-  const [extractedJobTitle, setExtractedJobTitle] = useState('Elettricista Tecnico Solare');
-  const [extractedSkills, setExtractedSkills] = useState(['Abilitazione CEI 11-27', 'Lavori in quota', 'Cablaggi DC/AC']);
+  const [extractedJobTitle, setExtractedJobTitle] = useState('Elettricista di Cantiere Solare');
+  const [extractedSkills, setExtractedSkills] = useState(['Abilitazione CEI 11-27', 'PLE', 'Cablaggi DC']);
   
   const [candidateName, setCandidateName] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -62,7 +62,6 @@ export default function CvEvaluator() {
     }
   };
 
-  // Scraper dell'annuncio tramite chiamata n8n
   const handleScrapeJobPosting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!jobUrl.trim()) return;
@@ -80,43 +79,43 @@ export default function CvEvaluator() {
         setExtractedJobTitle(data.title || "Profilo Estratto da Link");
         setExtractedSkills(data.mandatory_skills || ["PES/PAV", "Certificato PLE"]);
       } else {
-        throw new Error("Fallback locale per l'annuncio");
+        throw new Error("Avvio Fallback offline per test");
       }
     } catch (err) {
-      // Fallback simulato se n8n non risponde
       setTimeout(() => {
         setExtractedJobTitle("Installatore Meccanico Fotovoltaico");
-        setExtractedSkills(["Montaggio staffaggi", "Zavorre tetti piani", "Uso linea vita", "Sicurezza Cantieri"]);
-      }, 1200);
+        setExtractedSkills(["Montaggio strutture", "Sicurezza Lavori in Quota", "PLE"]);
+      }, 1000);
     } finally {
       setIsScraping(false);
     }
   };
 
-  // Screening del CV contro l'annuncio rintracciato
   const handleAnalyzeNewCv = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!candidateName.trim()) return;
 
-    const success = await deductCredits(50, `Analisi CV: ${candidateName} per annuncio "${extractedJobTitle}"`);
+    const success = await deductCredits(50, `Screening CV: ${candidateName}`);
     if (!success) return;
 
     setIsAnalyzing(true);
 
     try {
-      const score = Math.floor(Math.random() * 25) + 72; // Score dinamico realistico
+      // Genera una congruenza a stelle casuale (da 1 a 5 stelle) per il mock, convertita in scala su 100
+      const randomStars = Math.floor(Math.random() * 4) + 2; // Da 2 a 5 stelle di test
+      const scoreOn100 = randomStars * 20;
 
       const mockAnalysis = {
         strengths: [
-          `Esperienza eccellente per la figura di: ${extractedJobTitle}`,
-          `Piena conformità sulle competenze minime richieste: ${extractedSkills.slice(0, 2).join(', ')}.`
+          `Forte corrispondenza tecnica con i requisiti dell'annuncio: ${extractedJobTitle}`,
+          `Possesso delle certificazioni chiave rilevate: ${extractedSkills.slice(0, 2).join(', ')}.`
         ],
         weaknesses: [
-          `Manca di esperienza pregressa specifica su inverter ibridi industriali.`
+          'Richiede un breve periodo di affiancamento iniziale sui quadri elettrici di media tensione.'
         ],
         certifications: extractedSkills,
-        location_proximity: 'Residente entro 20 km dal cantiere principale.',
-        job_match_justification: `Il candidato Mario Rossi ha uno score del ${score}% rispetto all'annuncio letto da internet. Rilevata ottima affinità e conformità tecnica.`
+        location_proximity: 'Residente in prossimità della sede logistica aziendale.',
+        job_match_justification: `Il candidato presenta una congruenza di ${randomStars} su 5 stelle con l'annuncio web specificato. Ottima attinenza tecnica delle esperienze maturate.`
       };
 
       const payload = {
@@ -124,7 +123,7 @@ export default function CvEvaluator() {
         candidate_name: candidateName,
         applied_role: extractedJobTitle,
         cv_file_url: 'https://hmpxgbzykwwqgfzifdlc.supabase.co/storage/v1/object/public/cv/esempio.pdf',
-        score: score,
+        score: scoreOn100,
         ai_analysis_json: mockAnalysis,
         status: 'da_valutare'
       };
@@ -150,25 +149,35 @@ export default function CvEvaluator() {
     }
   };
 
+  // Funzione helper per disegnare le stelle dorate basate sul punteggio
+  const renderStars = (score: number) => {
+    const starCount = Math.max(1, Math.min(5, Math.ceil(score / 20)));
+    return (
+      <div className="flex text-amber-400 space-x-1">
+        {"★".repeat(starCount)}{"☆".repeat(5 - starCount)}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-white">Screening CV via URL Annuncio</h1>
-        <p className="text-zinc-400 mt-1">Incolla l'annuncio web pubblicato. L'AI leggerà la pagina ed esegue il matching esatto del CV inviato.</p>
+        <p className="text-zinc-400 mt-1">Confronta il CV caricato con i requisiti dell'annuncio ed ottieni una congruenza da 1 a 5 stelle.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <div className="space-y-6">
           
-          {/* Box 1: Lettura URL Annuncio */}
+          {/* Box 1: Inserimento Link Annuncio */}
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4">
             <h2 className="text-lg font-bold text-white flex items-center">
               1. Carica Annuncio Online
               <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
                 ℹ️
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-2.5 text-center text-xs font-normal text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition duration-150 whitespace-normal">
-                  Incolla un link da LinkedIn o Indeed. n8n estrarrà il testo con GPT-4o per leggerne i requisiti.
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Incolla un URL di un annuncio web attivo. n8n leggerà la pagina web con GPT-4o per isolarne i requisiti.
                 </span>
               </span>
             </h2>
@@ -176,35 +185,32 @@ export default function CvEvaluator() {
             <form onSubmit={handleScrapeJobPosting} className="space-y-3">
               <input 
                 type="url" 
-                placeholder="Incolla link annuncio di lavoro" 
+                placeholder="Incolla link annuncio" 
                 value={jobUrl}
                 onChange={(e) => setJobUrl(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none"
               />
-              <button type="submit" disabled={isScraping || !jobUrl} className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 disabled:opacity-50 text-xs font-semibold rounded-lg border border-zinc-700 text-zinc-300 transition">
-                {isScraping ? "Scansione in corso..." : "🔍 Scansiona Link Annuncio"}
+              <button type="submit" disabled={isScraping || !jobUrl} className="w-full py-2 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg text-zinc-300 transition">
+                {isScraping ? "Lettura pagina..." : "🔍 Scansiona Link Annuncio"}
               </button>
             </form>
 
             {extractedJobTitle && (
               <div className="bg-zinc-800/50 border border-zinc-800 p-4 rounded-xl space-y-2">
-                <span className="text-xs text-zinc-400 block font-semibold">Profilo Ricercato Rilevato:</span>
+                <span className="text-xs text-zinc-400 block font-semibold">Figura Rilevata nell'Annuncio:</span>
                 <span className="text-sm text-emerald-400 block font-bold">{extractedJobTitle}</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {extractedSkills.map((s, i) => <span key={i} className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded border border-zinc-750">{s}</span>)}
-                </div>
               </div>
             )}
           </div>
 
-          {/* Box 2: Screening del Candidato */}
+          {/* Box 2: Screening Candidato */}
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4">
             <h2 className="text-lg font-bold text-white flex items-center">
               2. Valuta Candidato
               <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
                 ℹ️
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-2.5 text-center text-xs font-normal text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition duration-150 whitespace-normal">
-                  Fai l'upload del CV e inserisci il nome. L'AI confronterà i dati personali del file con l'annuncio caricato sopra. (Costo: 50 crediti).
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Sottoponi il file del CV dell'operaio. L'AI leggerà il PDF confrontandolo con i requisiti estratti sopra. (Costo: 50 crediti).
                 </span>
               </span>
             </h2>
@@ -221,7 +227,7 @@ export default function CvEvaluator() {
                 <span className="text-xs text-zinc-500 block">Trascina qui il CV (PDF)</span>
               </div>
               <button type="submit" disabled={isAnalyzing || !candidateName} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">
-                {isAnalyzing ? "Analisi AI in corso..." : "✨ Analizza CV (50 crediti)"}
+                {isAnalyzing ? "Confronto in corso..." : "✨ Confronta CV (50 crediti)"}
               </button>
             </form>
           </div>
@@ -232,24 +238,24 @@ export default function CvEvaluator() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="p-6 border-b border-zinc-800">
-              <h2 className="text-lg font-bold text-white">Profili Analizzati</h2>
+              <h2 className="text-lg font-bold text-white">Candidati Caricati</h2>
             </div>
             
             {loading ? (
-              <div className="p-10 text-center text-zinc-500">Recupero database in corso...</div>
+              <div className="p-10 text-center text-zinc-500">Lettura candidati in corso...</div>
             ) : candidates.length === 0 ? (
-              <div className="p-10 text-center text-zinc-500 text-sm">Nessuna candidatura registrata su questo annuncio.</div>
+              <div className="p-10 text-center text-zinc-500 text-sm">Nessuna candidatura registrata su questa ricerca.</div>
             ) : (
               <div className="divide-y divide-zinc-800">
                 {candidates.map((c) => (
                   <div key={c.id} onClick={() => setSelectedCandidate(c)} className="p-6 flex items-center justify-between hover:bg-zinc-800 cursor-pointer transition">
                     <div>
                       <h3 className="font-bold text-white">{c.candidate_name}</h3>
-                      <p className="text-xs text-emerald-400 mt-1">Sottoposto a: {c.applied_role}</p>
+                      <p className="text-xs text-emerald-400 mt-1">Confrontato con: {c.applied_role}</p>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-6">
                       <span className="text-xs bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-300">{c.status}</span>
-                      <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${c.score >= 80 ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'}`}>{c.score}%</span>
+                      {renderStars(c.score)}
                     </div>
                   </div>
                 ))}
@@ -260,13 +266,18 @@ export default function CvEvaluator() {
           {/* Dettagli della Valutazione */}
           {selectedCandidate && (
             <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl space-y-6 animate-fadeIn">
-              <div>
-                <h3 className="text-2xl font-bold text-white">{selectedCandidate.candidate_name}</h3>
-                <p className="text-sm text-emerald-400">Match AI con l'annuncio: "{selectedCandidate.applied_role}"</p>
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-white">{selectedCandidate.candidate_name}</h3>
+                  <p className="text-sm text-emerald-400">Match con: {selectedCandidate.applied_role}</p>
+                </div>
+                <div className="text-xl">
+                  {renderStars(selectedCandidate.score)}
+                </div>
               </div>
 
               <div className="p-4 bg-zinc-800 rounded-xl border border-zinc-700 text-sm text-zinc-300 leading-relaxed">
-                <strong>📝 Resoconto del Confronto AI:</strong><br/>
+                <strong>📝 Giustificazione di Corrispondenza AI:</strong><br/>
                 {selectedCandidate.ai_analysis_json.job_match_justification}
               </div>
 
