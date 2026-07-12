@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
+import ReportPreview from '@/components/ReportPreview';
 
 interface Coordinate {
   lat: number;
@@ -15,6 +16,7 @@ interface SavedRoof {
   area: number;
   polygonLayer: any;
   panelLayers: any[];
+  panelCount: number; // Conteggio reale dei moduli
 }
 
 export default function PvPlanner() {
@@ -26,18 +28,20 @@ export default function PvPlanner() {
   const [savedRoofs, setSavedRoofs] = useState<SavedRoof[]>([]);
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
 
-  const [costPerKwp, setCostPerKwp] = useState(1300); 
-  const [fixedCosts, setFixedCosts] = useState(1500); 
+  // Parametri di tariffazione
+  const [costPerKwp, setCostPerKwp] = useState(1300);
+  const [fixedCosts, setFixedCosts] = useState(1500);
   const [includeStorage, setIncludeStorage] = useState(false);
-  const [storageCapacity, setStorageCapacity] = useState(15); 
+  const [storageCapacity, setStorageCapacity] = useState(15);
   const [costPerKwhStorage, setCostPerKwhStorage] = useState(600);
 
+  // Dati di output aggregati
   const [totalAreaSqm, setTotalAreaSqm] = useState(0);
   const [peakPower, setPeakPower] = useState(0);
   const [annualProduction, setAnnualProduction] = useState(0);
   const [annualSavings, setAnnualSavings] = useState(0);
   const [estimatedCost, setEstimatedCost] = useState(0);
-  const [monthlyBill, setMonthlyBill] = useState('600'); 
+  const [monthlyBill, setMonthlyBill] = useState('600');
 
   const mapRef = useRef<any>(null);
   const activeMarkersRef = useRef<any[]>([]);
@@ -45,23 +49,6 @@ export default function PvPlanner() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    const styleEl = document.createElement('style');
-    styleEl.innerHTML = `
-      .leaflet-container { cursor: crosshair !important; }
-      .leaflet-tile {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      @media print {
-        body { background: white !important; color: black !important; }
-        header, aside, footer, .print\\:hidden { display: none !important; }
-        .print\\:block { display: block !important; }
-        .print\\:grid { display: grid !important; }
-        #map-pv { height: 350px !important; width: 100% !important; visibility: visible !important; display: block !important; }
-      }
-    `;
-    document.head.appendChild(styleEl);
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -77,7 +64,6 @@ export default function PvPlanner() {
     document.body.appendChild(script);
 
     return () => {
-      styleEl.remove();
       link.remove();
       script.remove();
     };
@@ -123,8 +109,6 @@ export default function PvPlanner() {
 
   const handleUndoLastPoint = () => {
     if (currentPoints.length === 0) return;
-    const L = (window as any).L;
-
     setCurrentPoints(prev => {
       const updated = prev.slice(0, -1);
       const lastMarker = activeMarkersRef.current.pop();
@@ -152,7 +136,6 @@ export default function PvPlanner() {
     }
   };
 
-  // Funzione geometrica di Ray-Casting cartesiana (X = Longitudine, Y = Latitudine)
   const isPointInPolygonLocal = (point: { x: number; y: number }, polygon: { x: number; y: number }[]) => {
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -164,73 +147,60 @@ export default function PvPlanner() {
     return inside;
   };
 
-  // Algoritmo di Rotazione e Posa dei moduli paralleli al primo lato tracciato (colmo/grondaia)
-  const generatePanels = (points: Coordinate[]): any[] => {
+  // Genera ed associa i moduli inclinati e cliccabili per la rimozione ostacoli
+  const generatePanels = (points: Coordinate[], roofId: string): any[] => {
     const L = (window as any).L;
     const addedPanels: any[] = [];
     if (!L || points.length < 3) return addedPanels;
 
-    // 1. Proiezioni pianeggianti (metri) per evitare distorsioni sferiche
     const latMid = points[0].lat * Math.PI / 180;
-    const project = (p: Coordinate) => ({
-      x: p.lng * 111320 * Math.cos(latMid),
-      y: p.lat * 110540
-    });
-    const unproject = (m: { x: number; y: number }) => ({
-      lat: m.y / 110540,
-      lng: m.x / (111320 * Math.cos(latMid))
-    });
+    const project = (p: Coordinate) => ({ x: p.lng * 111320 * Math.cos(latMid), y: p.lat * 110540 });
+    const unproject = (m: { x: number; y: number }) => ({ lat: m.y / 110540, lng: m.x / (111320 * Math.cos(latMid)) });
 
     const m0 = project(points[0]);
     const m1 = project(points[1]);
-
-    // 2. Calcola l'angolo naturale della prima linea (grondaia)
     const angleRad = Math.atan2(m1.y - m0.y, m1.x - m0.x);
 
-    // Helpers per ruotare le coordinate cartesiane intorno al baricentro m0
     const rotate = (p: { x: number; y: number }, rad: number) => ({
       x: p.x * Math.cos(rad) - p.y * Math.sin(rad),
       y: p.x * Math.sin(rad) + p.y * Math.cos(rad)
     });
 
-    // 3. Ruota l'intero poligono del tetto "all'indietro" di -angle per raddrizzarlo
     const localVertices = points.map(p => {
       const proj = project(p);
-      const diff = { x: proj.x - m0.x, y: proj.y - m0.y };
-      return rotate(diff, -angleRad);
+      return rotate({ x: proj.x - m0.x, y: proj.y - m0.y }, -angleRad);
     });
 
-    // 4. Trova l'ingombro (Bounding Box) raddrizzato
     const xs = localVertices.map(v => v.x);
     const ys = localVertices.map(v => v.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
 
-    // Dimensioni dinamiche pescate dalle impostazioni brand
     const panelWidth = tenant?.panel_width_m || 1.65;
     const panelHeight = tenant?.panel_height_m || 1.0;
 
-    // 5. Distribuisci la griglia cartesiana sull'area raddrizzata
     for (let lx = minX; lx < maxX; lx += panelWidth) {
       for (let ly = minY; ly < maxY; ly += panelHeight) {
         const center = { x: lx + panelWidth / 2, y: ly + panelHeight / 2 };
 
-        if (isPointInPolygonLocal(center, localVertices)) {
-          // Calcola i 4 angoli del pannello locale
-          const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
-          const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
-          const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
-          const c4 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.95 };
+        // Calcola i 4 angoli geometrici locali
+        const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
+        const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
+        const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
+        const c4 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.95 };
 
-          // Ruota i 4 angoli in avanti (+angle) e convertili in coordinate geografiche reali
+        // Un pannello viene ammesso solo se TUTTI e quattro i suoi angoli rimangono rigorosamente dentro la falda
+        if (
+          isPointInPolygonLocal(c1, localVertices) &&
+          isPointInPolygonLocal(c2, localVertices) &&
+          isPointInPolygonLocal(c3, localVertices) &&
+          isPointInPolygonLocal(c4, localVertices)
+        ) {
           const geoCorners = [c1, c2, c3, c4].map(c => {
             const rot = rotate(c, angleRad);
             return unproject({ x: rot.x + m0.x, y: rot.y + m0.y });
           });
 
-          // Disegna il pannello inclinato
+          // Disegna il pannello sulla mappa satellitare
           const panel = L.polygon(geoCorners.map(gc => [gc.lat, gc.lng]), {
             color: '#1e293b',
             fillColor: '#0f172a',
@@ -238,27 +208,26 @@ export default function PvPlanner() {
             weight: 1
           }).addTo(mapRef.current);
 
+          // Cliccando sul pannello, l'utente lo rimuove (Es: ostacolo, camino, lucernario)
+          panel.on('click', () => {
+            panel.remove();
+            setSavedRoofs(prev => prev.map(r => {
+              if (r.id === roofId) {
+                return { 
+                  ...r, 
+                  panelCount: Math.max(0, r.panelCount - 1),
+                  panelLayers: r.panelLayers.filter((p: any) => p !== panel)
+                };
+              }
+              return r;
+            }));
+          });
+
           addedPanels.push(panel);
         }
       }
     }
     return addedPanels;
-  };
-
-  const calculateAreaInSqm = (points: Coordinate[]) => {
-    if (points.length < 3) return 0;
-    const latMid = points[0].lat * Math.PI / 180;
-    const meters = points.map(p => ({
-      x: p.lng * 111320 * Math.cos(latMid),
-      y: p.lat * 110540
-    }));
-
-    let area = 0;
-    for (let i = 0; i < meters.length; i++) {
-      const j = (i + 1) % meters.length;
-      area += meters[i].x * meters[j].y - meters[j].x * meters[i].y;
-    }
-    return Math.abs(area / 2);
   };
 
   const handleSaveCurrentRoof = () => {
@@ -268,21 +237,21 @@ export default function PvPlanner() {
     }
 
     const area = calculateAreaInSqm(currentPoints);
+    const roofId = `roof-${Date.now()}`;
+
+    // Disegna i moduli ed imposta il listener di cancellazione per ciascuno
+    const panelLayers = generatePanels(currentPoints, roofId);
     const L = (window as any).L;
-
-    // Genera e disegna i pannelli orientati
-    const panelLayers = generatePanels(currentPoints);
-
     const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
 
-    const index = savedRoofs.length + 1;
     const newRoof: SavedRoof = {
-      id: `roof-${Date.now()}`,
-      name: `Area Tetto #${index}`,
+      id: roofId,
+      name: `Area Tetto #${savedRoofs.length + 1}`,
       points: currentPoints,
       area,
       polygonLayer,
-      panelLayers
+      panelLayers,
+      panelCount: panelLayers.length
     };
 
     setSavedRoofs(prev => [...prev, newRoof]);
@@ -293,9 +262,7 @@ export default function PvPlanner() {
     const roofToDelete = savedRoofs.find(r => r.id === id);
     if (roofToDelete) {
       if (roofToDelete.polygonLayer) roofToDelete.polygonLayer.remove();
-      if (roofToDelete.panelLayers) {
-        roofToDelete.panelLayers.forEach((p: any) => p.remove());
-      }
+      if (roofToDelete.panelLayers) roofToDelete.panelLayers.forEach((p: any) => p.remove());
     }
     setSavedRoofs(prev => prev.filter(r => r.id !== id));
   };
@@ -313,24 +280,27 @@ export default function PvPlanner() {
     let finalRoofs = [...savedRoofs];
     if (currentPoints.length >= 3) {
       const area = calculateAreaInSqm(currentPoints);
+      const roofId = `roof-last`;
+      const panelLayers = generatePanels(currentPoints, roofId);
       const L = (window as any).L;
-      const panelLayers = generatePanels(currentPoints);
       const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
       
       finalRoofs.push({
-        id: `roof-last`,
+        id: roofId,
         name: `Area Finale`,
         points: currentPoints,
         area,
         polygonLayer,
-        panelLayers
+        panelLayers,
+        panelCount: panelLayers.length
       });
     }
 
     const totalArea = finalRoofs.reduce((acc, r) => acc + r.area, 0);
     setTotalAreaSqm(totalArea);
 
-    const estimPeakPower = (totalArea / 1.65) * 0.43;
+    const totalActualPanels = finalRoofs.reduce((acc, r) => acc + r.panelCount, 0);
+    const estimPeakPower = totalActualPanels * 0.430; // 430Wp a pannello reale
     setPeakPower(estimPeakPower);
 
     const success = await deductCredits(150, `Studio di Fattibilità Industriale (${finalRoofs.length} falde): ${address}`);
@@ -401,19 +371,16 @@ export default function PvPlanner() {
     }
   };
 
-  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
-  const brandColor = tenant?.brand_color_hex || '#0284c7';
-
   return (
     <div className="space-y-8">
       <div className="print:hidden">
         <h1 className="text-3xl font-bold tracking-tight text-white">PV Planner Industriale</h1>
-        <p className="text-zinc-400 mt-1">Progetta impianti multiarea su capannoni. Traccia le campate, visualizza i moduli inclinati e stampa l'offerta.</p>
+        <p className="text-zinc-400 mt-1">Traccia le falde dei capannoni. Tocca un pannello per rimuovere gli ostacoli (camini/lucernari) ed esporta il PDF.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
         
-        {/* Controlli */}
+        {/* Barra di comando */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Punta il Capannone</label>
@@ -423,7 +390,6 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Falda in disegno */}
           {currentPoints.length > 0 && (
             <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
               <span className="text-xs font-bold text-white block">Falda in Disegno (In Corso)</span>
@@ -440,7 +406,6 @@ export default function PvPlanner() {
             </div>
           )}
 
-          {/* Tabella Aree */}
           {savedRoofs.length > 0 && (
             <div className="space-y-3">
               <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Elenco Aree Capannone</span>
@@ -453,7 +418,10 @@ export default function PvPlanner() {
                       onChange={(e) => handleRenameRoof(roof.id, e.target.value)}
                       className="bg-transparent font-bold text-xs text-white border-b border-zinc-700 focus:border-emerald-500 focus:outline-none flex-1 py-0.5"
                     />
-                    <span className="text-xs text-zinc-400 shrink-0 font-semibold">{Math.round(roof.area)} mq</span>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs text-zinc-300 font-semibold block">{Math.round(roof.area)} mq</span>
+                      <span className="text-[10px] text-emerald-400 block">{roof.panelCount} Moduli</span>
+                    </div>
                     <button onClick={() => handleDeleteRoof(roof.id)} className="text-red-400 hover:text-red-300 text-xs shrink-0 px-1">
                       🗑️
                     </button>
@@ -463,7 +431,7 @@ export default function PvPlanner() {
             </div>
           )}
 
-          {/* Configurazione Parametri Economici */}
+          {/* Parametri Economici */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Listino Costi Industriali</span>
             <div className="space-y-3">
@@ -520,101 +488,18 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Output del Preventivo */}
+      {/* Output del Preventivo delegato al nuovo componente ReportPreview */}
       {isCalculated && (
-        <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-8 print:bg-white print:text-black print:border-0 print:p-0 animate-fadeIn">
-          
-          <div className="flex items-start justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
-              <p className="text-xs text-zinc-400 print:text-zinc-600 font-medium">Offerta economica per impianto fotovoltaico connesso in rete con formula "chiavi in mano"</p>
-              {address && <p className="text-xs text-zinc-500 font-semibold">📍 Edificio / Capannone sito in: {address}</p>}
-            </div>
-            
-            <div className="text-right text-xs text-zinc-400 print:text-zinc-700 space-y-1">
-              <span className="font-bold text-white print:text-black text-sm block">Riferimenti Commerciali</span>
-              <p>Email: {tenant?.notification_email || 'tecnico@novasolar.it'}</p>
-              <p>Data Offerta: {new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 print:grid-cols-5">
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
-              <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Superficie Totale</span>
-              <input type="number" value={totalAreaSqm.toFixed(1)} onChange={(e) => setTotalAreaSqm(parseFloat(e.target.value) || 0)} className="bg-transparent text-xl font-bold text-white print:text-black focus:outline-none border-b border-dashed border-zinc-700 w-full mt-1" />
-              <span className="text-[9px] text-zinc-500 block mt-1">Falde tracciate: {savedRoofs.length || 1}</span>
-            </div>
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
-              <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Potenza Nominale</span>
-              <input type="number" step="0.1" value={peakPower.toFixed(2)} onChange={(e) => setPeakPower(parseFloat(e.target.value) || 0)} className="bg-transparent text-xl font-bold text-emerald-400 print:text-emerald-700 focus:outline-none border-b border-dashed border-zinc-700 w-full mt-1" />
-              <span className="text-[9px] text-zinc-500 block mt-1">Circa {panelCount} moduli da 430W</span>
-            </div>
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
-              <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Produzione Annua</span>
-              <input type="number" value={Math.round(annualProduction)} onChange={(e) => setAnnualProduction(parseInt(e.target.value) || 0)} className="bg-transparent text-xl font-bold text-white print:text-black focus:outline-none border-b border-dashed border-zinc-700 w-full mt-1" />
-              <span className="text-[9px] text-zinc-500 block mt-1">Stima database PVGIS</span>
-            </div>
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
-              <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Accumulo (Batteria)</span>
-              <span className="text-xl font-bold text-white print:text-black block mt-1">{includeStorage ? `${storageCapacity} kWh` : 'Non presente'}</span>
-              <span className="text-[9px] text-zinc-500 block mt-1">Industrial Lithium Pack</span>
-            </div>
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
-              <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Risparmio Stimato</span>
-              <input type="number" value={Math.round(annualSavings)} onChange={(e) => setAnnualSavings(parseInt(e.target.value) || 0)} className="bg-transparent text-xl font-bold text-emerald-400 print:text-emerald-700 focus:outline-none border-b border-dashed border-zinc-700 w-full mt-1" />
-              <span className="text-[9px] text-zinc-500 block mt-1">Risparmio economico annuo</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-zinc-300 print:text-zinc-800 uppercase tracking-wider">Cosa comprende l'offerta "Chiavi in Mano":</h3>
-              <ul className="text-xs text-zinc-400 print:text-zinc-700 space-y-2.5 list-disc pl-4">
-                <li>Progettazione esecutiva e redazione del fascicolo tecnico a cura di ingegneri abilitati.</li>
-                <li>Fornitura dei moduli fotovoltaici in silicio monocristallino ad alta efficienza.</li>
-                <li>Installazione meccanica con strutture certificate TUV resistenti ad agenti atmosferici.</li>
-                <li>Pratiche burocratiche per la connessione alla rete elettrica nazionale (Enel) e G.S.E.</li>
-                <li>Manutenzione ordinaria gratuita e monitoraggio Wi-Fi da remoto per i primi 12 mesi.</li>
-              </ul>
-            </div>
-
-            <div className="bg-zinc-800/40 p-6 rounded-2xl border border-zinc-800 print:bg-zinc-100 print:border-zinc-300 flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-bold text-zinc-400 print:text-zinc-600 uppercase block">Riepilogo Investimento Economico</span>
-                <p className="text-[11px] text-zinc-500 mt-1">Importo complessivo omnicomprensivo comprensivo di IVA agevolata 10%.</p>
-              </div>
-
-              <div className="pt-4 border-t border-zinc-800 print:border-zinc-300 mt-4 flex items-baseline justify-between">
-                <span className="text-sm font-bold text-zinc-300 print:text-black">Totale Investimento:</span>
-                <div className="text-right">
-                  <span className="text-3xl font-black text-white print:text-black" style={{ color: brandColor }}>
-                    € {estimatedCost.toLocaleString()}
-                  </span>
-                  <span className="text-[10px] text-zinc-500 block mt-0.5">IVA 10% COMPRESA</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden print:flex items-center justify-between pt-16 mt-8 border-t border-zinc-200">
-            <div className="text-center w-64 border-b border-zinc-400 pb-2">
-              <p className="text-[10px] text-zinc-500">Timbro e Firma per Conferma (Azienda)</p>
-            </div>
-            <div className="text-center w-64 border-b border-zinc-400 pb-2">
-              <p className="text-[10px] text-zinc-500">Firma per Accettazione (Cliente)</p>
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:hidden">
-            <span className="text-xs text-zinc-500">
-              *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di premere esporta per allinearli ai tuoi listini esatti.
-            </span>
-            <button onClick={() => window.print()} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition">
-              🖨️ Stampa / Esporta PDF
-            </button>
-          </div>
-
-        </div>
+        <ReportPreview 
+          tenant={tenant}
+          address={address}
+          savedRoofs={savedRoofs}
+          totalArea={totalAreaSqm}
+          initialPower={peakPower}
+          initialProduction={annualProduction}
+          initialSavings={annualSavings}
+          initialCost={estimatedCost}
+        />
       )}
     </div>
   );
