@@ -16,7 +16,7 @@ interface SavedRoof {
   area: number;
   polygonLayer: any;
   panelLayers: any[];
-  panelCount: number; // Conteggio reale dei moduli
+  panelCount: number; 
 }
 
 export default function PvPlanner() {
@@ -136,17 +136,6 @@ export default function PvPlanner() {
     }
   };
 
-  const isPointInPolygonLocal = (point: { x: number; y: number }, polygon: { x: number; y: number }[]) => {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].x, yi = polygon[i].y;
-      const xj = polygon[j].x, yj = polygon[j].y;
-      const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  };
-
   // Genera ed associa i moduli inclinati e cliccabili per la rimozione ostacoli
   const generatePanels = (points: Coordinate[], roofId: string): any[] => {
     const L = (window as any).L;
@@ -182,13 +171,11 @@ export default function PvPlanner() {
       for (let ly = minY; ly < maxY; ly += panelHeight) {
         const center = { x: lx + panelWidth / 2, y: ly + panelHeight / 2 };
 
-        // Calcola i 4 angoli geometrici locali
         const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
         const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
         const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
         const c4 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.95 };
 
-        // Un pannello viene ammesso solo se TUTTI e quattro i suoi angoli rimangono rigorosamente dentro la falda
         if (
           isPointInPolygonLocal(c1, localVertices) &&
           isPointInPolygonLocal(c2, localVertices) &&
@@ -200,7 +187,6 @@ export default function PvPlanner() {
             return unproject({ x: rot.x + m0.x, y: rot.y + m0.y });
           });
 
-          // Disegna il pannello sulla mappa satellitare
           const panel = L.polygon(geoCorners.map(gc => [gc.lat, gc.lng]), {
             color: '#1e293b',
             fillColor: '#0f172a',
@@ -208,7 +194,6 @@ export default function PvPlanner() {
             weight: 1
           }).addTo(mapRef.current);
 
-          // Cliccando sul pannello, l'utente lo rimuove (Es: ostacolo, camino, lucernario)
           panel.on('click', () => {
             panel.remove();
             setSavedRoofs(prev => prev.map(r => {
@@ -239,7 +224,6 @@ export default function PvPlanner() {
     const area = calculateAreaInSqm(currentPoints);
     const roofId = `roof-${Date.now()}`;
 
-    // Disegna i moduli ed imposta il listener di cancellazione per ciascuno
     const panelLayers = generatePanels(currentPoints, roofId);
     const L = (window as any).L;
     const polygonLayer = L.polygon(currentPoints.map(p => [p.lat, p.lng]), { color: '#10b981', fillOpacity: 0.35 }).addTo(mapRef.current);
@@ -300,7 +284,7 @@ export default function PvPlanner() {
     setTotalAreaSqm(totalArea);
 
     const totalActualPanels = finalRoofs.reduce((acc, r) => acc + r.panelCount, 0);
-    const estimPeakPower = totalActualPanels * 0.430; // 430Wp a pannello reale
+    const estimPeakPower = totalActualPanels * 0.430; 
     setPeakPower(estimPeakPower);
 
     const success = await deductCredits(150, `Studio di Fattibilità Industriale (${finalRoofs.length} falde): ${address}`);
@@ -455,11 +439,11 @@ export default function PvPlanner() {
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-700">
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Capacità (kWh)</label>
-                      <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-700 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
+                      <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-750 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
                     </div>
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Costo/kWh (€)</label>
-                      <input type="number" value={costPerKwhStorage} onChange={(e) => setCostPerKwhStorage(parseInt(e.target.value) || 0)} className="w-full bg-zinc-700 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
+                      <input type="number" value={costPerKwhStorage} onChange={(e) => setCostPerKwhStorage(parseInt(e.target.value) || 0)} className="w-full bg-zinc-750 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
                     </div>
                   </div>
                 )}
@@ -488,7 +472,6 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Output del Preventivo delegato al nuovo componente ReportPreview */}
       {isCalculated && (
         <ReportPreview 
           tenant={tenant}
@@ -503,4 +486,32 @@ export default function PvPlanner() {
       )}
     </div>
   );
+}
+
+// Funzioni matematiche pure esterne (Hoisted nativamente per evitare TDZ)
+function calculateAreaInSqm(points: Coordinate[]) {
+  if (points.length < 3) return 0;
+  const latMid = points[0].lat * Math.PI / 180;
+  const meters = points.map(p => ({
+    x: p.lng * 111320 * Math.cos(latMid),
+    y: p.lat * 110540
+  }));
+
+  let area = 0;
+  for (let i = 0; i < meters.length; i++) {
+    const j = (i + 1) % meters.length;
+    area += meters[i].x * meters[j].y - meters[j].x * meters[i].y;
+  }
+  return Math.abs(area / 2);
+}
+
+function isPointInPolygonLocal(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
 }
