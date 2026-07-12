@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 import MapPlanner from '@/components/MapPlanner';
 import ReportPreview from '@/components/ReportPreview';
@@ -46,97 +46,18 @@ export default function PvPlanner() {
   const [estimatedCost, setEstimatedCost] = useState(0);
   const [monthlyBill, setMonthlyBill] = useState('600');
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => {
-      initializeMap();
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      link.remove();
-      script.remove();
-    };
-  }, []);
-
-  const initializeMap = () => {
-    const L = (window as any).L;
-    if (!L) return;
-
-    const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
-    mapRef.current = map;
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 22,
-      maxNativeZoom: 19,
-      attribution: 'Esri, Maxar'
-    }).addTo(map);
-
-    map.on('click', (e: any) => {
-      const { lat, lng } = e.latlng;
-      addPolygonPoint({ lat, lng });
-    });
-  };
-
-  const mapRef = useRef<any>(null);
-  const activeMarkersRef = useRef<any[]>([]);
-  const activePolygonRef = useRef<any>(null);
-
-  const addPolygonPoint = (point: Coordinate) => {
-    const L = (window as any).L;
-    if (!L || isCalculated) return;
-
-    setCurrentPoints(prev => {
-      const updated = [...prev, point];
-      const marker = L.marker([point.lat, point.lng]).addTo(mapRef.current);
-      activeMarkersRef.current.push(marker);
-
-      if (activePolygonRef.current) {
-        activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
-      } else {
-        activePolygonRef.current = L.polygon(updated.map(p => [p.lat, p.lng]), { color: brandColor, fillOpacity: 0.25 }).addTo(mapRef.current);
-      }
-
-      return updated;
-    });
+  // Callback intercettata al clic sulla mappa satellitare
+  const handleMapClick = (point: Coordinate) => {
+    if (isCalculated) return;
+    setCurrentPoints(prev => [...prev, point]);
   };
 
   const handleUndoLastPoint = () => {
-    if (currentPoints.length === 0) return;
-    setCurrentPoints(prev => {
-      const updated = prev.slice(0, -1);
-      const lastMarker = activeMarkersRef.current.pop();
-      if (lastMarker) lastMarker.remove();
-
-      if (activePolygonRef.current) {
-        if (updated.length >= 3) {
-          activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
-        } else {
-          activePolygonRef.current.remove();
-          activePolygonRef.current = null;
-        }
-      }
-      return updated;
-    });
+    setCurrentPoints(prev => prev.slice(0, -1));
   };
 
   const clearMapPoints = () => {
     setCurrentPoints([]);
-    activeMarkersRef.current.forEach(m => m.remove());
-    activeMarkersRef.current = [];
-    if (activePolygonRef.current) {
-      activePolygonRef.current.remove();
-      activePolygonRef.current = null;
-    }
   };
 
   const handleSaveCurrentRoof = () => {
@@ -240,8 +161,11 @@ export default function PvPlanner() {
         const { lat, lon } = data[0];
         const newCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
         handleResetPlanner();
-        if (mapRef.current) {
-          mapRef.current.setView([newCoords.lat, newCoords.lng], 19); 
+        // Spediamo le nuove coordinate alla mappa modificandone la vista
+        const L = (window as any).L;
+        const map = (window as any).mapRef?.current; 
+        if (map) {
+          map.setView([newCoords.lat, newCoords.lng], 19);
         }
       } else {
         alert("Indirizzo non trovato.");
@@ -273,7 +197,7 @@ export default function PvPlanner() {
           </form>
 
           {/* Slider di rotazione manuale */}
-          <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-2">
+          <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
               <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
@@ -334,11 +258,11 @@ export default function PvPlanner() {
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-700">
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Capacità (kWh)</label>
-                      <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
+                      <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-750 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
                     </div>
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Costo/kWh (€)</label>
-                      <input type="number" value={costPerKwhStorage} onChange={(e) => setCostPerKwhStorage(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
+                      <input type="number" value={costPerKwhStorage} onChange={(e) => setCostPerKwhStorage(parseInt(e.target.value) || 0)} className="w-full bg-zinc-750 border border-zinc-650 text-xs text-white p-2 rounded-lg mt-1" />
                     </div>
                   </div>
                 )}
@@ -405,7 +329,6 @@ function calculateAreaInSqm(points: Coordinate[]) {
   return Math.abs(area / 2);
 }
 
-// Calcolatore geometrico parallelo ed autonomo lato client per stimare i moduli senza dipendenze Leaflet
 function calculatePanelCount(points: Coordinate[], panelWidth: number, panelHeight: number, rotation: number): number {
   if (points.length < 3) return 0;
 
