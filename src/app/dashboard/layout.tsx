@@ -1,62 +1,81 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { TenantProvider, useTenant } from '@/app/context/TenantContext';
+
+interface ChatMessage {
+  id: string;
+  text: string;
+  sender: 'bot' | 'user';
+}
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Lista dei link di navigazione della Dashboard
-  const navItems = [
-    {
-      name: "PV Planner (Mappa)",
-      href: "/dashboard/pv-planner",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-        </svg>
-      )
-    },
-    {
-      name: "Valutazione CV",
-      href: "/dashboard/cv-evaluator",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      )
-    },
-    {
-      name: "Social Creator",
-      href: "/dashboard/social-creator",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-      )
-    },
-    {
-      name: "Widget Lead AI",
-      href: "/dashboard/widget-config",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-        </svg>
-      )
-    },
-    {
-      name: "Impostazioni Brand",
-      href: "/dashboard/settings",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-        </svg>
-      )
+  // Stato Chatbot "Giulia AI"
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: 'init-1', text: "Ciao! Sono Giulia, l'assistente di Free Energy. Sono qui per aiutarti a configurare la piattaforma e ad usare i moduli al meglio.", sender: 'bot' }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
+  }, [messages, isTyping]);
+
+  const sendChatMessage = async (textOverride?: string) => {
+    const text = (textOverride || inputValue).trim();
+    if (!text) return;
+
+    setInputValue('');
+    const userMsgId = 'user-' + Date.now();
+    setMessages(prev => [...prev, { id: userMsgId, text, sender: 'user' }]);
+    setIsTyping(true);
+
+    try {
+      const res = await fetch(WEBHOOK_ADMIN_CHATBOT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          sessionId: localStorage.getItem('fe_admin_session') || 'fe_' + Math.random().toString(36).substring(7),
+          tenant_id: tenant?.id
+        })
+      });
+
+      const raw = await res.text();
+      let reply = 'Errore di risposta.';
+      try {
+        const data = JSON.parse(raw);
+        reply = data.output || data.response || data.text || raw;
+      } catch (_) {
+        reply = raw;
+      }
+
+      setMessages(prev => [...prev, { id: 'bot-' + Date.now(), text: reply, sender: 'bot' }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Scusami, connessione al server n8n interrotta.', sender: 'bot' }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const navItems = [
+    { name: "PV Planner (Mappa)", href: "/dashboard/pv-planner", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
+    { name: "Valutazione CV", href: "/dashboard/cv-evaluator", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+    { name: "Social Creator", href: "/dashboard/social-creator", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> },
+    { name: "Widget Lead AI", href: "/dashboard/widget-config", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg> },
+    { name: "Impostazioni Brand", href: "/dashboard/settings", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> }
   ];
 
   const brandColor = tenant?.brand_color_hex || '#0284c7';
@@ -64,109 +83,84 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium">Inizializzazione Free Energy...</p>
-        </div>
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div 
-      className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row"
-      style={{ '--brand-color': brandColor } as React.CSSProperties}
-    >
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
+      
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 p-6 space-y-8 flex-shrink-0">
         <div className="flex items-center space-x-3">
-          {tenant?.logo_url ? (
-            <img src={tenant.logo_url} alt="Logo" className="h-8 max-w-[120px] object-contain" />
-          ) : (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm" style={{ backgroundColor: brandColor }}>
-              {tenant?.company_name.substring(0, 2).toUpperCase()}
-            </div>
-          )}
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm" style={{ backgroundColor: brandColor }}>
+            {tenant?.company_name.substring(0, 2).toUpperCase()}
+          </div>
           <span className="font-bold text-lg text-white tracking-tight">{tenant?.company_name}</span>
         </div>
-
         <nav className="flex-1 space-y-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
-              <Link 
-                key={item.href} 
-                href={item.href}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition duration-200 ${
-                  isActive 
-                    ? 'text-white' 
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
-                }`}
-                style={isActive ? { backgroundColor: `${brandColor}20`, borderLeft: `3px solid ${brandColor}` } : {}}
-              >
+              <Link key={item.href} href={item.href} className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition ${isActive ? 'text-white bg-zinc-800' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'}`} style={isActive ? { borderLeft: `3px solid ${brandColor}` } : {}}>
                 <span style={isActive ? { color: brandColor } : {}}>{item.icon}</span>
                 <span>{item.name}</span>
               </Link>
             );
           })}
         </nav>
-
-        {/* Info Box Crediti residui */}
         <div className="bg-zinc-850 border border-zinc-800 p-4 rounded-2xl">
-          <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Crediti Attivi</span>
+          <span className="text-xs font-semibold text-zinc-400 uppercase block">Crediti Attivi</span>
           <span className="text-2xl font-black text-white mt-1 block">{tenant?.credits.toLocaleString()}</span>
-          <span className="text-[10px] text-zinc-500 mt-1 block">Nessuna scadenza attiva</span>
         </div>
       </aside>
 
-      {/* Header Mobile */}
-      <header className="md:hidden bg-zinc-900 border-b border-zinc-800 p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-xs" style={{ backgroundColor: brandColor }}>
-            {tenant?.company_name.substring(0, 2).toUpperCase()}
-          </div>
-          <span className="font-bold text-white">{tenant?.company_name}</span>
-        </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-          className="p-2 text-zinc-400 hover:text-white"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
-          </svg>
-        </button>
-      </header>
-
-      {/* Menu Navigazione Mobile */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-zinc-900 border-b border-zinc-800 px-6 py-4 space-y-3">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link 
-                key={item.href} 
-                href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center space-x-3 p-3 rounded-lg text-sm font-medium ${
-                  isActive ? 'bg-zinc-800 text-white' : 'text-zinc-400'
-                }`}
-              >
-                {item.icon}
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
-          <div className="bg-zinc-850 p-4 rounded-xl mt-4">
-            <span className="text-xs text-zinc-400 block">Crediti Residui</span>
-            <span className="text-lg font-bold text-white mt-1 block">{tenant?.credits.toLocaleString()}</span>
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area */}
-      <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto">
+      <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto relative pb-24">
         {children}
       </main>
+
+      {/* Chatbot Galleggiante Giulia AI */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        {chatOpen && (
+          <div className="w-80 h-96 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
+            <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
+                <span className="font-bold text-sm text-white">Giulia AI (Assistente)</span>
+              </div>
+              <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white text-lg">✕</button>
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-zinc-900/60 scrollbar-none">
+              {messages.map((m) => (
+                <div key={m.id} className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${m.sender === 'user' ? 'bg-emerald-500 text-zinc-950 ml-auto rounded-br-none' : 'bg-zinc-800 text-zinc-300 mr-auto rounded-bl-none'}`}>
+                  {m.text}
+                </div>
+              ))}
+              {isTyping && <div className="text-zinc-500 italic">Giulia sta digitando...</div>}
+              <div ref={messagesEndRef} />
+            </div>
+            
+            {/* Chips di selezione rapida */}
+            <div className="px-4 py-2 bg-zinc-900 flex gap-1.5 overflow-x-auto scrollbar-none border-t border-zinc-850">
+              <button onClick={() => sendChatMessage("Come uso il PV Planner?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">🛰️ PV Planner</button>
+              <button onClick={() => sendChatMessage("Come si caricano i CV?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">📄 Valutazione CV</button>
+              <button onClick={() => sendChatMessage("Dove trovo il widget per il sito?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-2.5 py-1 rounded-full text-zinc-300 shrink-0">🔌 Codice Widget</button>
+            </div>
+
+            <div className="p-3 bg-zinc-950 border-t border-zinc-800 flex gap-2">
+              <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()} placeholder="Fai una domanda..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500" />
+              <button onClick={() => sendChatMessage()} className="bg-emerald-500 text-zinc-950 font-bold px-3 py-2 rounded-lg text-xs">Invia</button>
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => setChatOpen(!chatOpen)} className="w-14 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-full shadow-lg flex items-center justify-center transition duration-200">
+          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+        </button>
+      </div>
+
     </div>
   );
 }
