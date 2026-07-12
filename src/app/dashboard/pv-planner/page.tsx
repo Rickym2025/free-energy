@@ -376,4 +376,15 @@ export default function PvPlanner() {
           {/* Pulsante di esportazione visibile solo a schermo */}
           <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:hidden">
             <span className="text-xs text-zinc-500">
-              *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima d
+              *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di premere esporta per allinearli ai tuoi listini esatti.
+            </span>
+            <button onClick={() => window.print()} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition">
+              🖨️ Stampa / Esporta PDF
+            </button>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
