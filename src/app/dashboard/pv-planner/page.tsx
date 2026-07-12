@@ -12,22 +12,21 @@ export default function PvPlanner() {
   const { tenant, deductCredits } = useTenant();
   const [address, setAddress] = useState('');
   const [loadingGeocode, setLoadingGeocode] = useState(false);
+  const [coords, setCoords] = useState<Coordinate | null>(null);
   const [polygonPoints, setPolygonPoints] = useState<Coordinate[]>([]);
   const [isCalculated, setIsCalculated] = useState(false);
 
-  // Configurazione dei parametri economici dell'installatore (personalizzabili)
-  const [costPerKwp, setCostPerKwp] = useState(1500); // Costo moduli e posa per kWp
-  const [fixedCosts, setFixedCosts] = useState(1200);  // Costi fissi pratiche, progettazione, collaudo
-  const [includeStorage, setIncludeStorage] = useState(false); // Opzione Batteria
-  const [storageCapacity, setStorageCapacity] = useState(5); // Capacità in kWh
-  const [costPerKwhStorage, setCostPerKwhStorage] = useState(700); // Costo accumulo per kWh
-
-  // Campi di output calcolati ed editabili per l'anteprima
   const [areaSqm, setAreaSqm] = useState(0);
   const [peakPower, setPeakPower] = useState(0);
   const [annualProduction, setAnnualProduction] = useState(0);
   const [annualSavings, setAnnualSavings] = useState(0);
-  const [estimatedCost, setEstimatedCost] = useState(0);
+  const [estimatedCost, setEstimatedCost] = useState(5500);
+
+  const [costPerKwp, setCostPerKwp] = useState(1500);
+  const [fixedCosts, setFixedCosts] = useState(1200);
+  const [includeStorage, setIncludeStorage] = useState(false);
+  const [storageCapacity, setStorageCapacity] = useState(5);
+  const [costPerKwhStorage, setCostPerKwhStorage] = useState(700);
 
   const [monthlyBill, setMonthlyBill] = useState('150');
 
@@ -38,7 +37,6 @@ export default function PvPlanner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Iniezione CSS per la mappa con mirino di precisione e corretta stampa
     const styleEl = document.createElement('style');
     styleEl.innerHTML = `
       .leaflet-container { cursor: crosshair !important; }
@@ -76,13 +74,14 @@ export default function PvPlanner() {
     const L = (window as any).L;
     if (!L) return;
 
-    // Impostiamo maxZoom a 19 per evitare l'errore 401 delle API Esri
-    const map = L.map('map-pv', { maxZoom: 19 }).setView([41.9028, 12.4964], 6);
+    // Zoom visivo della mappa esteso a 22 per un puntamento ravvicinatissimo
+    const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
     mapRef.current = map;
 
-    // Anche il TileLayer deve bloccarsi a zoom 19
+    // maxZoom visivo impostato a 22, maxNativeZoom fisso a 19 per evitare l'errore 401 ed allungare i tasselli
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19,
+      maxZoom: 22,
+      maxNativeZoom: 19,
       attribution: 'Esri, Maxar'
     }).addTo(map);
 
@@ -134,7 +133,7 @@ export default function PvPlanner() {
         const newCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
         clearMapPoints();
         if (mapRef.current) {
-          mapRef.current.setView([newCoords.lat, newCoords.lng], 19); // Puntiamo il satellite ad altissima risoluzione
+          mapRef.current.setView([newCoords.lat, newCoords.lng], 19); // Messa a fuoco a livello 19 (perfetto dettaglio)
         }
       } else {
         alert("Indirizzo non trovato.");
@@ -173,7 +172,7 @@ export default function PvPlanner() {
     const estimPeakPower = (area / 1.65) * 0.43;
     setPeakPower(estimPeakPower);
 
-    const success = await deductCredits(150, `Elaborazione Preventivo Tecnico Solare: ${address}`);
+    const success = await deductCredits(150, `Elaborazione Report Solare: ${address}`);
     if (!success) return;
 
     setLoadingGeocode(true);
@@ -185,7 +184,6 @@ export default function PvPlanner() {
       setAnnualProduction(productionVal);
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, productionVal * 0.25));
       
-      // Calcolo economico basato sui parametri personalizzati
       let costTotal = (estimPeakPower * costPerKwp) + fixedCosts;
       if (includeStorage) {
         costTotal += (storageCapacity * costPerKwhStorage);
@@ -213,18 +211,25 @@ export default function PvPlanner() {
 
   return (
     <div className="space-y-8">
-      {/* Intestazione visibile solo a schermo */}
       <div className="print:hidden">
         <h1 className="text-3xl font-bold tracking-tight text-white">PV Planner</h1>
-        <p className="text-zinc-400 mt-1">Disegna il tetto tramite il mirino di precisione satellitare, configura i costi aziendali e genera il PDF dell'offerta.</p>
+        <p className="text-zinc-400 mt-1">Traccia la falda del tetto e personalizza il preventivo grafico per il tuo cliente prima di scaricarlo.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
         
-        {/* Barra laterale controlli */}
+        {/* Pannello di Input */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Cerca l'indirizzo dell'edificio</label>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center">
+              Cerca Indirizzo
+              <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Inserisci la via, il civico e il comune per allineare il satellite sul tetto.
+                </span>
+              </span>
+            </label>
             <div className="flex gap-2">
               <input type="text" placeholder="Es: Via Roma 10, Milano" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
               <button type="submit" className="bg-zinc-800 border border-zinc-700 px-4 rounded-xl text-white transition">🔍</button>
@@ -238,21 +243,21 @@ export default function PvPlanner() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Costo al kWp (€)</label>
-                  <input type="number" value={costPerKwp} onChange={(e) => setCostPerKwp(parseInt(e.target.value) || 0)} className="w-full bg-zinc-850 border border-zinc-750 text-xs text-white p-2 rounded-lg mt-1" />
+                  <input type="number" value={costPerKwp} onChange={(e) => setCostPerKwp(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
                 </div>
                 <div>
                   <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Fissi & Pratiche (€)</label>
-                  <input type="number" value={fixedCosts} onChange={(e) => setFixedCosts(parseInt(e.target.value) || 0)} className="w-full bg-zinc-850 border border-zinc-750 text-xs text-white p-2 rounded-lg mt-1" />
+                  <input type="number" value={fixedCosts} onChange={(e) => setFixedCosts(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
                 </div>
               </div>
 
-              <div className="bg-zinc-850 p-3 rounded-xl border border-zinc-800 space-y-2">
+              <div className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-zinc-300 font-bold">Includi Accumulo (Batteria)</span>
                   <input type="checkbox" checked={includeStorage} onChange={(e) => setIncludeStorage(e.target.checked)} className="rounded text-emerald-500" />
                 </div>
                 {includeStorage && (
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-700">
                     <div>
                       <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Capacità (kWh)</label>
                       <input type="number" value={storageCapacity} onChange={(e) => setStorageCapacity(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2 rounded-lg mt-1" />
@@ -284,14 +289,13 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Output del Preventivo e foglio di stampa A4 */}
+      {/* Output / Preventivo EDITABILE */}
       {isCalculated && (
-        <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-8 print:bg-white print:text-black print:border-0 print:p-0">
+        <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-8 print:bg-white print:text-black print:border-0 print:p-0 animate-fadeIn">
           
-          {/* Header del preventivo: Visualizza i dati commerciali dell'installatore */}
           <div className="flex items-start justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
             <div className="space-y-1">
-              <h2 className="text-2xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Nova Solar SRL'}</h2>
+              <h2 className="text-2xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
               <p className="text-xs text-zinc-400 print:text-zinc-600 font-medium">Offerta economica per impianto fotovoltaico connesso in rete con formula "chiavi in mano"</p>
               {address && <p className="text-xs text-zinc-500 font-semibold">📍 Edificio sito in: {address}</p>}
             </div>
@@ -303,7 +307,6 @@ export default function PvPlanner() {
             </div>
           </div>
 
-          {/* Dettagli tecnici dell'offerta */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 print:grid-cols-5">
             <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
               <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Superficie Misurata</span>
@@ -332,7 +335,6 @@ export default function PvPlanner() {
             </div>
           </div>
 
-          {/* Dettaglio descrittivo dei servizi inclusi */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-zinc-300 print:text-zinc-800 uppercase tracking-wider">Cosa comprende l'offerta "Chiavi in Mano":</h3>
@@ -345,7 +347,6 @@ export default function PvPlanner() {
               </ul>
             </div>
 
-            {/* Specifica dei Costi Complessivi */}
             <div className="bg-zinc-800/40 p-6 rounded-2xl border border-zinc-800 print:bg-zinc-100 print:border-zinc-300 flex flex-col justify-between">
               <div>
                 <span className="text-xs font-bold text-zinc-400 print:text-zinc-600 uppercase block">Riepilogo Investimento Economico</span>
@@ -364,7 +365,6 @@ export default function PvPlanner() {
             </div>
           </div>
 
-          {/* Area di firma per accettazione */}
           <div className="hidden print:flex items-center justify-between pt-16 mt-8 border-t border-zinc-200">
             <div className="text-center w-64 border-b border-zinc-400 pb-2">
               <p className="text-[10px] text-zinc-500">Timbro e Firma per Conferma (Azienda)</p>
@@ -374,7 +374,6 @@ export default function PvPlanner() {
             </div>
           </div>
 
-          {/* Pulsante di esportazione visibile solo a schermo */}
           <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:hidden">
             <span className="text-xs text-zinc-500">
               *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di premere esporta per allinearli ai tuoi listini esatti.
