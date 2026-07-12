@@ -7,21 +7,19 @@ export default function SocialCreator() {
   const { tenant, deductCredits } = useTenant();
   const [targetLocation, setTargetLocation] = useState('Ariano nel Polesine');
   const [systemDetails, setSystemDetails] = useState('Impianto 6 kWp con accumulo da 10kWh e detrazione fiscale al 50%');
-  const [platform, setPlatform] = useState('facebook'); // 'facebook', 'reel_script', 'stories'
-  const [marketingAngle, setMarketingAngle] = useState('risparmio'); // 'risparmio', 'indipendenza', 'risoluzione_obiezioni'
+  const [platform, setPlatform] = useState('facebook');
+  const [marketingAngle, setMarketingAngle] = useState('risparmio');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // URL del tuo webhook n8n (può essere configurato dinamicamente)
-  const N8N_WEBHOOK_URL = "https://n8n.rmstudio.app/webhook/free-energy-social-creator"; 
+  const N8N_WEBHOOK_URL = "https://n8n.rmstudio.app/webhook/free-energy-social-creator";
 
   const handleGenerateSocialKit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetLocation.trim() || !systemDetails.trim()) return;
 
-    // Scaliamo i 100 crediti definiti nel modello pay-as-you-go
-    const success = await deductCredits(100, `Generazione Post Social AI per localita: ${targetLocation}`);
+    const success = await deductCredits(100, `Generazione Post Social per: ${targetLocation}`);
     if (!success) return;
 
     setIsGenerating(true);
@@ -29,12 +27,9 @@ export default function SocialCreator() {
     setCopied(false);
 
     try {
-      // Chiamata reale al webhook di n8n su Hetzner
       const response = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenant?.id,
           company_name: tenant?.company_name,
@@ -53,11 +48,8 @@ export default function SocialCreator() {
           return;
         }
       }
-      throw new Error("n8n offline o risposta non strutturata. Avvio fallback locale.");
+      throw new Error("Avvio Fallback offline");
     } catch (err) {
-      console.warn(err);
-      
-      // Fallback locale di emergenza (Copywriting di neuromarketing pre-strutturato)
       setTimeout(() => {
         let fallbackText = "";
         if (platform === 'facebook') {
@@ -109,99 +101,75 @@ export default function SocialCreator() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Pannello Input Configurazione */}
+        {/* Pannello Input (Grigi solidi standard) */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
-          <h2 className="text-lg font-bold text-white font-sans">Parametri Campagna</h2>
+          <h2 className="text-lg font-bold text-white flex items-center">
+            Parametri Campagna
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+              ℹ️
+              <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal">
+                Configura i parametri geografici e dell'impianto per ottenere un copy ad alta conversione. (Costo: 100 crediti).
+              </span>
+            </span>
+          </h2>
           
           <form onSubmit={handleGenerateSocialKit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Località Target (Comune)</label>
-              <input 
-                type="text" 
-                value={targetLocation}
-                onChange={(e) => setTargetLocation(e.target.value)}
-                required
-                className="w-full bg-zinc-850 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white"
-              />
+              <input type="text" value={targetLocation} onChange={(e) => setTargetLocation(e.target.value)} required className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Dettagli Soluzione / Offerta</label>
-              <textarea 
-                value={systemDetails}
-                onChange={(e) => setSystemDetails(e.target.value)}
-                rows={3}
-                required
-                className="w-full bg-zinc-850 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white resize-none"
-              />
+              <textarea value={systemDetails} onChange={(e) => setSystemDetails(e.target.value)} rows={3} required className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none resize-none" />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Piattaforma Social</label>
-              <select 
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                className="w-full bg-zinc-850 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white"
-              >
-                <option value="facebook">Post Facebook (Lungo + Emoticon)</option>
-                <option value="reel_script">Script Video Reel / TikTok (Con indicazioni di regia)</option>
-                <option value="stories">Sequenza Instagram Stories (3 Slide)</option>
+              <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none">
+                <option value="facebook">Post Facebook</option>
+                <option value="reel_script">Script Video Reel / TikTok</option>
+                <option value="stories">Sequenza Instagram Stories</option>
               </select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Angolo di Coprywriting</label>
-              <select 
-                value={marketingAngle}
-                onChange={(e) => setMarketingAngle(e.target.value)}
-                className="w-full bg-zinc-850 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white"
-              >
-                <option value="risparmio">Risparmio Economico e Bolletta Zero</option>
-                <option value="indipendenza">Indipendenza Energetica dai Rincari</option>
-                <option value="risoluzione_obiezioni">Meteo Invernale e Burocrazia</option>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Angolo di Copywriting</label>
+              <select value={marketingAngle} onChange={(e) => setMarketingAngle(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none">
+                <option value="risparmio">Risparmio Economico</option>
+                <option value="indipendenza">Indipendenza Energetica</option>
+                <option value="risoluzione_obiezioni">Burocrazia e Meteo</option>
               </select>
             </div>
 
-            <button 
-              type="submit"
-              disabled={isGenerating}
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition duration-200"
-            >
-              {isGenerating ? "Scrittura in corso..." : "✨ Genera Campagna (100 crediti)"}
+            <button type="submit" disabled={isGenerating} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">
+              {isGenerating ? "Scrittura..." : "✨ Genera Campagna (100 crediti)"}
             </button>
           </form>
         </div>
 
-        {/* Pannello Output Copy Generato */}
+        {/* Pannello Output */}
         <div className="lg:col-span-2 flex flex-col min-h-[450px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-          <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+          <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">Contenuto Generato dall'AI</h2>
             {generatedContent && (
-              <button 
-                onClick={copyToClipboard}
-                className="px-4 py-2 bg-zinc-850 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-300 transition"
-              >
+              <button onClick={copyToClipboard} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-semibold text-zinc-300 transition">
                 {copied ? "Copiato! ✅" : "Copia Testo 📋"}
               </button>
             )}
           </div>
           
-          <div className="flex-1 p-8 flex items-center justify-center">
+          <div className="flex-1 p-8 bg-zinc-900 flex">
             {isGenerating ? (
-              <div className="flex flex-col items-center space-y-4">
+              <div className="flex flex-col items-center justify-center w-full space-y-4">
                 <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm text-zinc-500">L'algoritmo sta strutturando la tua campagna di neuromarketing locale...</p>
               </div>
             ) : generatedContent ? (
-              <textarea 
-                value={generatedContent}
-                readOnly
-                className="w-full h-full min-h-[350px] bg-transparent text-zinc-200 text-sm leading-relaxed focus:outline-none resize-none font-mono"
-              />
+              <textarea value={generatedContent} readOnly className="w-full h-full min-h-[350px] bg-transparent text-zinc-200 text-sm leading-relaxed focus:outline-none resize-none font-mono" />
             ) : (
-              <div className="text-center max-w-sm">
+              <div className="text-center max-w-sm mx-auto flex flex-col justify-center">
                 <span className="text-4xl block mb-4">✍️</span>
-                <p className="text-sm text-zinc-500 leading-relaxed">Configura i parametri a sinistra e fai clic su genera per ricevere una campagna marketing pronta per essere copiata e pubblicata sui tuoi canali aziendali.</p>
+                <p className="text-sm text-zinc-500">Imposta i parametri a sinistra e clicca su "Genera" per ricevere il copy.</p>
               </div>
             )}
           </div>
