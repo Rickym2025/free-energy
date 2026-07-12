@@ -16,12 +16,11 @@ export default function PvPlanner() {
   const [polygonPoints, setPolygonPoints] = useState<Coordinate[]>([]);
   const [isCalculated, setIsCalculated] = useState(false);
 
-  // Campi di output EDITABILI dall'utente per personalizzare il report finale
   const [areaSqm, setAreaSqm] = useState(0);
   const [peakPower, setPeakPower] = useState(0);
   const [annualProduction, setAnnualProduction] = useState(0);
   const [annualSavings, setAnnualSavings] = useState(0);
-  const [estimatedCost, setEstimatedCost] = useState(5500); // Costo manuale impostabile
+  const [estimatedCost, setEstimatedCost] = useState(5500);
 
   const [monthlyBill, setMonthlyBill] = useState('150');
 
@@ -142,7 +141,7 @@ export default function PvPlanner() {
 
   const handleGenerateReport = async () => {
     if (polygonPoints.length < 3) {
-      alert("Disegna prima la sagoma del tetto cliccando almeno su 3 punti.");
+      alert("Attenzione: clicca sulla mappa satellitare per definire almeno 3 punti (il perimetro del tetto) prima di elaborare il report.");
       return;
     }
 
@@ -162,7 +161,7 @@ export default function PvPlanner() {
       const productionVal = data.outputs?.totals?.fixed?.E_y || (estimPeakPower * 1350);
       setAnnualProduction(productionVal);
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, productionVal * 0.25));
-      setEstimatedCost(Math.round(estimPeakPower * 1200)); // Costo medio indicativo
+      setEstimatedCost(Math.round(estimPeakPower * 1200));
       setIsCalculated(true);
     } catch (err) {
       const localProductionEstimate = estimPeakPower * 1350;
@@ -191,8 +190,8 @@ export default function PvPlanner() {
               Cerca Indirizzo
               <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
                 ℹ️
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-center text-xs text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition duration-150">
-                  Inserisci la via, il civico e il comune per puntare il satellite.
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal">
+                  Inserisci la via, il civico e il comune per allineare il satellite sul tetto.
                 </span>
               </span>
             </label>
@@ -207,8 +206,8 @@ export default function PvPlanner() {
               Spesa Mensile (€)
               <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
                 ℹ️
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-center text-xs text-zinc-300 shadow-2xl opacity-0 group-hover:opacity-100 transition duration-150">
-                  La bolletta mensile media del cliente per stimare il risparmio finanziario dell'impianto.
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal">
+                  La bolletta media mensile del cliente, utile all'algoritmo per stimare l'ammortamento dell'investimento.
                 </span>
               </span>
             </label>
@@ -216,7 +215,7 @@ export default function PvPlanner() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <button onClick={handleGenerateReport} disabled={polygonPoints.length < 3 || isCalculated} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">🚀 Elabora Preventivo (150 crediti)</button>
+            <button onClick={handleGenerateReport} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl transition">🚀 Elabora Preventivo (150 crediti)</button>
             <button onClick={clearMapPoints} className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl text-sm transition">Reset Mappa</button>
           </div>
         </div>
@@ -227,7 +226,7 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Output / Anteprima Preventivo EDITABILE */}
+      {/* Output / Preventivo EDITABILE */}
       {isCalculated && (
         <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-6 print:bg-white print:text-black print:border-0 print:p-0">
           
@@ -270,7 +269,7 @@ export default function PvPlanner() {
 
           <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:border-zinc-300">
             <span className="text-xs text-zinc-500 print:text-zinc-600">
-              *Puoi modificare liberamente i valori delle celle se desideri allineare i dati alle preferenze commerciali del cliente.
+              *I valori sopra sono interamente modificabili. Puoi personalizzarli a piacimento prima di generare il PDF.
             </span>
             <button onClick={() => window.print()} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition print:hidden">
               🖨️ Stampa / Esporta PDF
