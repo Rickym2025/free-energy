@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useTenant } from '@/context/TenantContext';
+import { useTenant } from '@/app/context/TenantContext';
 
 export default function DashboardHome() {
   const { tenant } = useTenant();
