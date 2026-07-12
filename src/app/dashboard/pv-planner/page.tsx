@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 import MapPlanner from '@/components/MapPlanner';
 import ReportPreview from '@/components/ReportPreview';
@@ -46,18 +46,111 @@ export default function PvPlanner() {
   const [estimatedCost, setEstimatedCost] = useState(0);
   const [monthlyBill, setMonthlyBill] = useState('600');
 
-  // Callback intercettata al clic sulla mappa satellitare
-  const handleMapClick = (point: Coordinate) => {
-    if (isCalculated) return;
-    setCurrentPoints(prev => [...prev, point]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => {
+      initializeMap();
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      link.remove();
+      script.remove();
+    };
+  }, []);
+
+  // AGGIORNAMENTO DINAMICO: Ricalcola istantaneamente i pannelli di tutte le aree ad ogni scatto dello slider
+  useEffect(() => {
+    const pWidth = tenant?.panel_width_m || 1.65;
+    const pHeight = tenant?.panel_height_m || 1.0;
+
+    setSavedRoofs(prev => prev.map(roof => {
+      const updatedCount = calculatePanelCount(roof.points, pWidth, pHeight, panelRotation);
+      return {
+        ...roof,
+        panelCount: updatedCount
+      };
+    }));
+  }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
+
+  const initializeMap = () => {
+    const L = (window as any).L;
+    if (!L) return;
+
+    const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
+    mapRef.current = map;
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 22,
+      maxNativeZoom: 19,
+      attribution: 'Esri, Maxar'
+    }).addTo(map);
+
+    map.on('click', (e: any) => {
+      const { lat, lng } = e.latlng;
+      addPolygonPoint({ lat, lng });
+    });
+  };
+
+  const mapRef = useRef<any>(null);
+  const activeMarkersRef = useRef<any[]>([]);
+  const activePolygonRef = useRef<any>(null);
+
+  const addPolygonPoint = (point: Coordinate) => {
+    const L = (window as any).L;
+    if (!L || isCalculated) return;
+
+    setCurrentPoints(prev => {
+      const updated = [...prev, point];
+      const marker = L.marker([point.lat, point.lng]).addTo(mapRef.current);
+      activeMarkersRef.current.push(marker);
+
+      if (activePolygonRef.current) {
+        activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
+      } else {
+        activePolygonRef.current = L.polygon(updated.map(p => [p.lat, p.lng]), { color: brandColor, fillOpacity: 0.25 }).addTo(mapRef.current);
+      }
+
+      return updated;
+    });
   };
 
   const handleUndoLastPoint = () => {
-    setCurrentPoints(prev => prev.slice(0, -1));
+    if (currentPoints.length === 0) return;
+    setCurrentPoints(prev => {
+      const updated = prev.slice(0, -1);
+      const lastMarker = activeMarkersRef.current.pop();
+      if (lastMarker) lastMarker.remove();
+
+      if (activePolygonRef.current) {
+        if (updated.length >= 3) {
+          activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
+        } else {
+          activePolygonRef.current.remove();
+          activePolygonRef.current = null;
+        }
+      }
+      return updated;
+    });
   };
 
   const clearMapPoints = () => {
     setCurrentPoints([]);
+    activeMarkersRef.current.forEach(m => m.remove());
+    activeMarkersRef.current = [];
+    if (activePolygonRef.current) {
+      activePolygonRef.current.remove();
+      activePolygonRef.current = null;
+    }
   };
 
   const handleSaveCurrentRoof = () => {
@@ -69,7 +162,6 @@ export default function PvPlanner() {
     const area = calculateAreaInSqm(currentPoints);
     const roofId = `roof-${Date.now()}`;
 
-    // Calcolo geometrico del numero reale di pannelli validi inseriti dentro la falda (White-label)
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
     const panelCount = calculatePanelCount(currentPoints, pWidth, pHeight, panelRotation);
@@ -161,7 +253,6 @@ export default function PvPlanner() {
         const { lat, lon } = data[0];
         const newCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
         handleResetPlanner();
-        // Spediamo le nuove coordinate alla mappa modificandone la vista
         const L = (window as any).L;
         const map = (window as any).mapRef?.current; 
         if (map) {
@@ -176,6 +267,13 @@ export default function PvPlanner() {
       setLoadingGeocode(false);
     }
   };
+
+  const handleMapClick = (point: Coordinate) => {
+    if (isCalculated) return;
+    setCurrentPoints(prev => [...prev, point]);
+  };
+
+  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
 
   return (
     <div className="space-y-8">
@@ -197,7 +295,7 @@ export default function PvPlanner() {
           </form>
 
           {/* Slider di rotazione manuale */}
-          <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
+          <div className="p-4 rounded-xl border border-zinc-750 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
               <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
