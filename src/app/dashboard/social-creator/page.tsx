@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useTenant } from '@/context/TenantContext';
+import { useTenant } from '@/app/context/TenantContext';
 
 export default function SocialCreator() {
   const { tenant, deductCredits } = useTenant();
