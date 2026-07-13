@@ -12,8 +12,11 @@ export interface Tenant {
   brand_color_hex: string;
   notification_email: string | null;
   credits: number;
-  panel_width_m: number;  // Aggiunto per CAD rotazione
-  panel_height_m: number; // Aggiunto per CAD rotazione
+  panel_width_m: number;
+  panel_height_m: number;
+  nexus_active: boolean; // Tracciamento servizio attivo
+  dentis_active: boolean; // Tracciamento servizio attivo
+  lexis_active: boolean;  // Tracciamento servizio attivo
 }
 
 interface TenantContextType {
@@ -22,6 +25,7 @@ interface TenantContextType {
   error: string | null;
   refreshTenant: () => Promise<void>;
   deductCredits: (amount: number, description: string) => Promise<boolean>;
+  activateService: (serviceName: 'nexus' | 'dentis' | 'lexis', cost: number) => Promise<boolean>;
   setTenantId: (id: string) => void;
 }
 
@@ -46,7 +50,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           notification_email: 'modena.riccardo@gmail.com',
           credits: 99999999,
           panel_width_m: 1.65,
-          panel_height_m: 1.0
+          panel_height_m: 1.0,
+          nexus_active: true,
+          dentis_active: true,
+          lexis_active: true
         });
         return;
       }
@@ -67,7 +74,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         setTenant({
           ...data[0],
           panel_width_m: data[0].panel_width_m || 1.65,
-          panel_height_m: data[0].panel_height_m || 1.0
+          panel_height_m: data[0].panel_height_m || 1.0,
+          nexus_active: data[0].nexus_active || false,
+          dentis_active: data[0].dentis_active || false,
+          lexis_active: data[0].lexis_active || false
         });
       } else {
         await createDemoTenantIfNotExist(id);
@@ -82,7 +92,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         notification_email: id === 'sipro-energy' ? 'info@siproenergy.it' : 'info@solisenergy.it',
         credits: id === 'sipro-energy' ? 10000 : 500,
         panel_width_m: 1.65,
-        panel_height_m: 1.0
+        panel_height_m: 1.0,
+        nexus_active: false,
+        dentis_active: false,
+        lexis_active: false
       });
     } finally {
       setLoading(false);
@@ -99,7 +112,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       brand_color_hex: '#0284c7',
       credits: initialCredits,
       panel_width_m: 1.65,
-      panel_height_m: 1.0
+      panel_height_m: 1.0,
+      nexus_active: false,
+      dentis_active: false,
+      lexis_active: false
     };
 
     try {
@@ -118,7 +134,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           setTenant({
             ...created[0],
             panel_width_m: created[0].panel_width_m || 1.65,
-            panel_height_m: created[0].panel_height_m || 1.0
+            panel_height_m: created[0].panel_height_m || 1.0,
+            nexus_active: created[0].nexus_active || false,
+            dentis_active: created[0].dentis_active || false,
+            lexis_active: created[0].lexis_active || false
           });
         }
       }
@@ -177,8 +196,42 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Funzione per attivare e sbloccare i moduli spendendo crediti
+  const activateService = async (serviceName: 'nexus' | 'dentis' | 'lexis', cost: number): Promise<boolean> => {
+    if (!tenant) return false;
+    
+    const success = await deductCredits(cost, `Attivazione modulo aggiuntivo: ${serviceName.toUpperCase()}`);
+    if (!success) return false;
+
+    try {
+      const payload: any = {};
+      payload[`${serviceName}_active`] = true;
+
+      await fetch(`${SUPABASE_URL}/rest/v1/tenants?id=eq.${tenant.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      setTenant(prev => prev ? { ...prev, ...payload } : null);
+      return true;
+    } catch (err) {
+      setTenant(prev => {
+        if (!prev) return null;
+        const fallback: any = { ...prev };
+        fallback[`${serviceName}_active`] = true;
+        return fallback;
+      });
+      return true;
+    }
+  };
+
   return (
-    <TenantContext.Provider value={{ tenant, loading, error, refreshTenant, deductCredits, setTenantId }}>
+    <TenantContext.Provider value={{ tenant, loading, error, refreshTenant, deductCredits, activateService, setTenantId }}>
       {children}
     </TenantContext.Provider>
   );
