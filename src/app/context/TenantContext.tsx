@@ -14,9 +14,8 @@ export interface Tenant {
   credits: number;
   panel_width_m: number;
   panel_height_m: number;
-  nexus_active: boolean; // Tracciamento servizio attivo
-  dentis_active: boolean; // Tracciamento servizio attivo
-  lexis_active: boolean;  // Tracciamento servizio attivo
+  nexus_active: boolean; 
+  dentis_active: boolean; 
 }
 
 interface TenantContextType {
@@ -25,7 +24,7 @@ interface TenantContextType {
   error: string | null;
   refreshTenant: () => Promise<void>;
   deductCredits: (amount: number, description: string) => Promise<boolean>;
-  activateService: (serviceName: 'nexus' | 'dentis' | 'lexis', cost: number) => Promise<boolean>;
+  activateService: (serviceName: 'nexus' | 'dentis', cost: number) => Promise<boolean>;
   setTenantId: (id: string) => void;
 }
 
@@ -52,8 +51,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           panel_width_m: 1.65,
           panel_height_m: 1.0,
           nexus_active: true,
-          dentis_active: true,
-          lexis_active: true
+          dentis_active: true
         });
         return;
       }
@@ -76,8 +74,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           panel_width_m: data[0].panel_width_m || 1.65,
           panel_height_m: data[0].panel_height_m || 1.0,
           nexus_active: data[0].nexus_active || false,
-          dentis_active: data[0].dentis_active || false,
-          lexis_active: data[0].lexis_active || false
+          dentis_active: data[0].dentis_active || false
         });
       } else {
         await createDemoTenantIfNotExist(id);
@@ -94,8 +91,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         panel_width_m: 1.65,
         panel_height_m: 1.0,
         nexus_active: false,
-        dentis_active: false,
-        lexis_active: false
+        dentis_active: false
       });
     } finally {
       setLoading(false);
@@ -114,8 +110,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       panel_width_m: 1.65,
       panel_height_m: 1.0,
       nexus_active: false,
-      dentis_active: false,
-      lexis_active: false
+      dentis_active: false
     };
 
     try {
@@ -136,8 +131,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
             panel_width_m: created[0].panel_width_m || 1.65,
             panel_height_m: created[0].panel_height_m || 1.0,
             nexus_active: created[0].nexus_active || false,
-            dentis_active: created[0].dentis_active || false,
-            lexis_active: created[0].lexis_active || false
+            dentis_active: created[0].dentis_active || false
           });
         }
       }
@@ -196,11 +190,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Funzione per attivare e sbloccare i moduli spendendo crediti
-  const activateService = async (serviceName: 'nexus' | 'dentis' | 'lexis', cost: number): Promise<boolean> => {
+  const activateService = async (serviceName: 'nexus' | 'dentis', cost: number): Promise<boolean> => {
     if (!tenant) return false;
     
-    const success = await deductCredits(cost, `Attivazione modulo aggiuntivo: ${serviceName.toUpperCase()}`);
+    const success = await deductCredits(cost, `Attivazione modulo: ${serviceName.toUpperCase()}`);
     if (!success) return false;
 
     try {
