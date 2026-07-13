@@ -20,9 +20,20 @@ interface Candidate {
   created_at: string;
 }
 
-// Lettura dinamica delle variabili d'ambiente con fallback statico
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
+// Funzioni di sanificazione per evitare errori di copiatura (spazi, virgolette, slash finali)
+const sanitizeUrl = (url: string) => {
+  return url.replace(/^["']|["']$/g, '').trim().replace(/\/$/, '');
+};
+
+const sanitizeKey = (key: string) => {
+  return key.replace(/^["']|["']$/g, '').trim();
+};
+
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
+const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
+
+const SUPABASE_URL = sanitizeUrl(rawUrl);
+const SUPABASE_ANON_KEY = sanitizeKey(rawKey);
 
 export default function CvEvaluator() {
   const { tenant, deductCredits } = useTenant();
@@ -60,7 +71,7 @@ export default function CvEvaluator() {
         setCandidates(data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Errore fetch candidati:", err);
     } finally {
       setLoading(false);
     }
@@ -68,7 +79,7 @@ export default function CvEvaluator() {
 
   const handleScrapeJobPosting = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jobUrl.trim()) return;
+    if (!jobUrl.trim() || isScraping) return;
     setIsScraping(true);
 
     try {
@@ -80,8 +91,8 @@ export default function CvEvaluator() {
 
       if (response.ok) {
         const data = await response.json();
-        setExtractedJobTitle(data.title || "Profilo Estratto da Link");
-        setExtractedSkills(data.mandatory_skills || ["PES/PAV", "Certificato PLE"]);
+        setExtractedJobTitle(data.title || data.job_title || "Profilo Estratto da Link");
+        setExtractedSkills(data.mandatory_skills || data.certificazioni_rilevate || ["PES/PAV", "Certificato PLE"]);
       } else {
         throw new Error("CORS o rete interrotta");
       }
@@ -98,10 +109,7 @@ export default function CvEvaluator() {
 
   const handleAnalyzeNewCv = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!candidateName.trim() || !selectedFile || !tenant) return;
-
-    const success = await deductCredits(50, `Screening CV: ${candidateName}`);
-    if (!success) return;
+    if (!candidateName.trim() || !selectedFile || !tenant || isAnalyzing) return;
 
     setIsAnalyzing(true);
 
@@ -135,7 +143,13 @@ export default function CvEvaluator() {
     };
 
     try {
-      // 1. Prova di upload su Supabase Storage (Se RLS o bucket mancano, fallisce ed entra nel catch)
+      // Spostato qui dentro: se il portafoglio crediti fallisce per problemi di rete, si attiva il paracadute
+      const success = await deductCredits(50, `Screening CV: ${candidateName}`);
+      if (!success) {
+        throw new Error("Transazione crediti non autorizzata o fallita");
+      }
+
+      // 1. Prova di upload su Supabase Storage
       const fileExt = selectedFile.name.split('.').pop();
       const uniqueFileName = `cv-${Date.now()}.${fileExt}`;
       const uploadUrl = `${SUPABASE_URL}/storage/v1/object/public/cv/${uniqueFileName}`;
@@ -154,7 +168,7 @@ export default function CvEvaluator() {
         throw new Error("Supabase Storage bloccato o non configurato");
       }
 
-      // 2. Chiamata reale al Webhook n8n (Se CORS o rete bloccano, fallisce ed entra nel catch)
+      // 2. Chiamata reale al Webhook n8n
       const n8nResponse = await fetch("https://n8n.rmstudio.app/webhook/compare-cv", {
         method: 'POST',
         headers: {
@@ -169,20 +183,20 @@ export default function CvEvaluator() {
       });
 
       if (!n8nResponse.ok) {
-        throw new Error("n8n Webhook bloccato da policy CORS");
+        throw new Error("n8n Webhook bloccato da policy CORS o offline");
       }
 
-      // Se le connessioni sono andate a buon fine, ripulisce e ricarica i dati reali dal DB
+      // Se tutto va a buon fine, pulisce il form e ricarica i dati aggiornati dal database
       setCandidateName('');
       setFileName(null);
       setSelectedFile(null);
       await fetchCandidates();
     } catch (err: any) {
-      console.warn("Connessioni cloud bloccate (CORS/401). Avvio paracadute locale per il collaudo:", err.message);
+      console.warn("Connessioni cloud interrotte. Attivazione paracadute locale:", err.message);
       
-      // PARACADUTE LOCALE: Inietta istantaneamente il candidato nella lista per prevenire il freeze dello schermo
+      // PARACADUTE LOCALE: Mostra subito il candidato fittizio a schermo
       setCandidates(prev => [fallbackCandidate, ...prev]);
-      setSelectedCandidate(fallbackCandidate); // Lo seleziona per mostrare subito il matching a 3 stelle
+      setSelectedCandidate(fallbackCandidate);
       
       setCandidateName('');
       setFileName(null);
@@ -207,7 +221,7 @@ export default function CvEvaluator() {
       {/* INTESTAZIONE */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-white">Screening Professionale CV</h1>
-        <p className="text-zinc-450 mt-2 text-sm leading-relaxed">
+        <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
           Confronta all'istante il profilo di un candidato con i requisiti del tuo annuncio di lavoro tramite intelligenza artificiale.
         </p>
       </div>
@@ -220,7 +234,7 @@ export default function CvEvaluator() {
           </span>
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 1: Configura i requisiti dell'annuncio
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-550 hover:text-emerald-400 text-xs">
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
               ℹ️
               <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
                 Incolla l'URL di un annuncio web attivo. n8n leggerà la pagina web per isolarne la figura e le competenze richieste.
@@ -262,7 +276,7 @@ export default function CvEvaluator() {
           </span>
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 2: Seleziona e analizza il candidato
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-550 hover:text-emerald-400 text-xs">
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
               ℹ️
               <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
                 Carica il file del CV dell'operaio in PDF. L'AI lo confronterà con l'annuncio sopra configurato. (Costo: 50 crediti).
@@ -362,7 +376,7 @@ export default function CvEvaluator() {
               </div>
             </div>
             <div>
-              <span className="text-xs font-bold text-zinc-450 uppercase tracking-wider block">Residenza e Logistica</span>
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Residenza e Logistica</span>
               <p className="text-sm text-zinc-300 mt-2 leading-relaxed font-semibold">📍 {selectedCandidate.ai_analysis_json.location_proximity}</p>
             </div>
           </div>
