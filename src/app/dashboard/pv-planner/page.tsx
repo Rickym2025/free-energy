@@ -18,6 +18,7 @@ interface SavedRoof {
   area: number;
   panelCount: number;
   lengths: number[];
+  deletedPanels: string[]; // Memorizza gli ID dei moduli rimossi manualmente (ostacoli)
 }
 
 export default function PvPlanner() {
@@ -34,7 +35,10 @@ export default function PvPlanner() {
   const [panelRotation, setPanelRotation] = useState(0); 
   const [mapCenter, setMapCenter] = useState<Coordinate | null>(null);
 
-  // Configurazione dei parametri economici
+  // Stato per identificare quale area salvata è correntemente selezionata per il trascinamento dei punti
+  const [selectedRoofId, setSelectedRoofId] = useState<string | null>(null);
+
+  // Parametri economici
   const [costPerPanel, setCostPerPanel] = useState(450); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
@@ -54,8 +58,8 @@ export default function PvPlanner() {
     const pHeight = tenant?.panel_height_m || 1.0;
 
     setSavedRoofs(prev => prev.map(roof => {
-      const updatedCount = calculatePanelCount(roof.points, pWidth, pHeight, panelRotation);
-      return { ...roof, panelCount: updatedCount };
+      const updatedCount = calculatePanelCount(roof.points, pWidth, pHeight, panelRotation) - (roof.deletedPanels?.length || 0);
+      return { ...roof, panelCount: Math.max(0, updatedCount) };
     }));
   }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
 
@@ -77,6 +81,38 @@ export default function PvPlanner() {
 
   const handleMarkerDrag = (index: number, newCoord: Coordinate) => {
     setCurrentPoints(prev => prev.map((p, idx) => idx === index ? newCoord : p));
+  };
+
+  // AGGIORNATO: Ricalcola interamente geometrie, lati e moduli di un tetto SALVATO quando viene trascinato un pin
+  const handleSavedRoofMarkerDrag = (roofId: string, index: number, newCoord: Coordinate) => {
+    const pWidth = tenant?.panel_width_m || 1.65;
+    const pHeight = tenant?.panel_height_m || 1.0;
+
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === roofId) {
+        const nextPoints = r.points.map((p, idx) => idx === index ? newCoord : p);
+        const area = calculateAreaInSqm(nextPoints);
+        
+        // Ricalcola i lati in metri
+        const lengths: number[] = [];
+        for (let i = 0; i < nextPoints.length; i++) {
+          const p1 = nextPoints[i];
+          const p2 = nextPoints[(i + 1) % nextPoints.length];
+          lengths.push(calculateDistanceMeters(p1, p2));
+        }
+
+        const panelCount = Math.max(0, calculatePanelCount(nextPoints, pWidth, pHeight, panelRotation) - (r.deletedPanels?.length || 0));
+
+        return {
+          ...r,
+          points: nextPoints,
+          area,
+          lengths,
+          panelCount
+        };
+      }
+      return r;
+    }));
   };
 
   const handleUndoLastPoint = () => {
@@ -113,19 +149,32 @@ export default function PvPlanner() {
       points: currentPoints,
       area,
       panelCount,
-      lengths
+      lengths,
+      deletedPanels: [] // Inizialmente nessun modulo escluso
     };
 
     setSavedRoofs(prev => [...prev, newRoof]);
     clearMapPoints();
   };
 
-  const handlePanelDeleted = (roofId: string) => {
-    setSavedRoofs(prev => prev.map(r => r.id === roofId ? { ...r, panelCount: Math.max(0, r.panelCount - 1) } : r));
+  // AGGIORNATO: Registra la chiave cartesiana del pannello eliminato per escluderlo stabilmente
+  const handlePanelDeleted = (roofId: string, panelKey: string) => {
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === roofId) {
+        const nextDeleted = r.deletedPanels ? [...r.deletedPanels, panelKey] : [panelKey];
+        return { 
+          ...r, 
+          deletedPanels: nextDeleted,
+          panelCount: Math.max(0, r.panelCount - 1) 
+        };
+      }
+      return r;
+    }));
   };
 
   const handleDeleteRoof = (id: string) => {
     setSavedRoofs(prev => prev.filter(r => r.id !== id));
+    if (selectedRoofId === id) setSelectedRoofId(null);
   };
 
   const handleRenameRoof = (id: string, newName: string) => {
@@ -203,8 +252,7 @@ export default function PvPlanner() {
     clearMapPoints();
     setSavedRoofs([]);
     setIsCalculated(false);
-    
-    // CORRETTO: Pulisce esplicitamente i riferimenti delle quote residue a schermo
+    setSelectedRoofId(null);
     if (typeof window !== 'undefined' && (window as any).tempLengthMarkers) {
       (window as any).tempLengthMarkers.forEach((m: any) => m.remove());
       (window as any).tempLengthMarkers = [];
@@ -258,6 +306,7 @@ export default function PvPlanner() {
           address={address} setAddress={setAddress}
           panelRotation={panelRotation} setPanelRotation={setPanelRotation}
           currentPoints={currentPoints} savedRoofs={savedRoofs}
+          selectedRoofId={selectedRoofId}
           costPerPanel={costPerPanel} setCostPerPanel={setCostPerPanel}
           fixedCosts={fixedCosts} setFixedCosts={setFixedCosts}
           includeStorage={includeStorage} setIncludeStorage={setIncludeStorage}
@@ -269,6 +318,7 @@ export default function PvPlanner() {
           onRenameRoof={handleRenameRoof} onUpdateLength={handleUpdateLength}
           onGenerateReport={handleGenerateReport}
           onResetPlanner={handleResetPlanner}
+          onSelectRoof={setSelectedRoofId} // Imposta l'area selezionata per il drag
         />
 
         <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative print:block print:h-[350px] print:w-full print:mb-8 print:border print:border-zinc-300 print:rounded-2xl">
@@ -280,9 +330,11 @@ export default function PvPlanner() {
             currentPoints={currentPoints}
             savedRoofs={savedRoofs}
             mapCenter={mapCenter}
+            selectedRoofId={selectedRoofId}
             onMapClick={handleMapClick}
             onPanelDeleted={handlePanelDeleted}
             onMarkerDrag={handleMarkerDrag}
+            onSavedRoofMarkerDrag={handleSavedRoofMarkerDrag} // Gestisce il trascinamento dei punti salvati
           />
         </div>
       </div>
@@ -305,6 +357,7 @@ export default function PvPlanner() {
   );
 }
 
+// Spostati all'esterno del componente per risolvere l'hoisting
 function calculateAreaInSqm(points: Coordinate[]) {
   if (points.length < 3) return 0;
   const latMid = points[0].lat * Math.PI / 180;
