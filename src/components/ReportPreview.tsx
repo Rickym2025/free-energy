@@ -44,7 +44,6 @@ export default function ReportPreview({
     setEstimatedCost(initialCost);
   }, [totalArea, initialPower, initialProduction, initialSavings, initialCost]);
 
-  // Cambia dinamicamente il nome del file PDF al momento del salvataggio browser
   const handlePrintPdf = () => {
     const originalTitle = document.title;
     const cleanAddress = address ? ` - ${address.split(',')[0]}` : '';
@@ -77,7 +76,6 @@ export default function ReportPreview({
             border-radius: 12px; 
             margin: 15px 0 !important; 
           }
-          /* Forza l'interruzione di pagina prima del riepilogo economico */
           .print-page-break {
             page-break-before: always !important;
             break-before: page !important;
@@ -89,12 +87,26 @@ export default function ReportPreview({
 
       {/* --- PRIMA PAGINA DEL PREVENTIVO --- */}
       <div className="space-y-6">
-        {/* Intestazione Commerciale */}
-        <div className="flex items-start justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
-            <p className="text-xs text-zinc-400 print:text-zinc-600 font-medium">Offerta economica per impianto fotovoltaico connesso in rete con formula "chiavi in mano"</p>
-            {address && <p className="text-xs text-emerald-400 print:text-emerald-700 font-bold mt-1">📍 Sito Installazione: {address}</p>}
+        
+        {/* Intestazione Commerciale con LOGO personalizzato o fallback testuale */}
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
+          <div className="flex items-center space-x-4">
+            {tenant?.logo_url ? (
+              <img 
+                src={tenant.logo_url} 
+                alt="Logo Azienda" 
+                className="h-12 max-w-[200px] object-contain print:text-black" 
+              />
+            ) : (
+              <div className="px-4 py-2 rounded-xl text-white font-black text-xl tracking-tight" style={{ backgroundColor: brandColor }}>
+                {tenant?.company_name ? tenant.company_name.substring(0, 2).toUpperCase() : 'SL'}
+              </div>
+            )}
+            <div className="space-y-0.5">
+              <h2 className="text-xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
+              <p className="text-[10px] text-zinc-400 print:text-zinc-600 font-medium">Fattibilità fotovoltaica connessa in rete con formula "chiavi in mano"</p>
+              {address && <p className="text-xs text-emerald-400 print:text-emerald-700 font-bold">📍 Sito: {address}</p>}
+            </div>
           </div>
           
           <div className="text-right text-xs text-zinc-400 print:text-zinc-700 space-y-1">
@@ -136,13 +148,13 @@ export default function ReportPreview({
           </div>
           <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
             <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Risparmio Stimato</span>
-            <input type="number" value={Math.round(annualSavings)} onChange={(e) => setAnnualSavings(parseInt(e.target.value) || 0)} className="bg-transparent text-xl font-bold text-emerald-400 print:text-emerald-700 focus:outline-none border-b border-dashed border-zinc-700 w-full mt-1" />
+            <input type="number" value={Math.round(annualSavings)} onChange={(e) => setAnnualSavings(parseFloat(e.target.value) || 0)} className="bg-transparent text-xl font-bold text-emerald-400 print:text-emerald-700 focus:outline-none border-b border-dashed border-zinc-700 w-full mt-1" />
             <span className="text-[9px] text-zinc-500 block mt-1">Risparmio economico annuo</span>
           </div>
         </div>
       </div>
 
-      {/* --- SECONDA PAGINA DEL PREVENTIVO (Forzata con print-page-break) --- */}
+      {/* --- SECONDA PAGINA DEL PREVENTIVO --- */}
       <div className="print-page-break pt-8 border-t border-zinc-800 print:border-t-0 grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-zinc-300 print:text-zinc-800 uppercase tracking-wider">Servizi inclusi nella nostra fornitura:</h3>
