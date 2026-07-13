@@ -20,8 +20,9 @@ interface Candidate {
   created_at: string;
 }
 
-const SUPABASE_URL = "https://hmpxgbzykwwqgfzifdlc.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
+// Lettura dinamica delle variabili d'ambiente con fallback statico
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
 
 export default function CvEvaluator() {
   const { tenant, deductCredits } = useTenant();
@@ -201,181 +202,201 @@ export default function CvEvaluator() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+      
+      {/* INTESTAZIONE */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Screening CV via URL Annuncio</h1>
-        <p className="text-zinc-400 mt-1">Confronta il CV caricato con i requisiti dell'annuncio ed ottieni una congruenza da 1 a 5 stelle.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-white">Screening Professionale CV</h1>
+        <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
+          Confronta all'istante il profilo di un candidato con i requisiti del tuo annuncio di lavoro tramite intelligenza artificiale.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        <div className="space-y-6">
-          
-          {/* Box 1: Inserimento Link Annuncio */}
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center">
-              1. Carica Annuncio Online
-              <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
-                ℹ️
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
-                  Incolla un URL di un annuncio web attivo. n8n leggerà la pagina web con GPT-4o per isolarne i requisiti.
-                </span>
+      {/* FASE 1: REQUISITI DELL'ANNUNCIO */}
+      <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4 shadow-xl">
+        <div className="flex items-center space-x-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 text-sm">
+            1
+          </span>
+          <h2 className="text-lg font-bold text-white flex items-center">
+            Fase 1: Configura i requisiti dell'annuncio
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
+              ℹ️
+              <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
+                Incolla l'URL di un annuncio web attivo. n8n leggerà la pagina web per isolarne la figura e le competenze richieste.
               </span>
-            </h2>
-            
-            <form onSubmit={handleScrapeJobPosting} className="space-y-3">
-              <input 
-                type="url" 
-                placeholder="Incolla link annuncio" 
-                value={jobUrl}
-                onChange={(e) => setJobUrl(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none"
-              />
-              <button type="submit" disabled={isScraping || !jobUrl} className="w-full py-2 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg text-zinc-300 transition">
-                {isScraping ? "Lettura pagina..." : "🔍 Scansiona Link Annuncio"}
-              </button>
-            </form>
-
-            {extractedJobTitle && (
-              <div className="bg-zinc-800/50 border border-zinc-800 p-4 rounded-xl space-y-2">
-                <span className="text-xs text-zinc-400 block font-semibold">Figura Rilevata nell'Annuncio:</span>
-                <span className="text-sm text-emerald-400 block font-bold">{extractedJobTitle}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Box 2: Screening Candidato */}
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4">
-            <h2 className="text-lg font-bold text-white flex items-center">
-              2. Valuta Candidato
-              <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400">
-                ℹ️
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
-                  Sottoponi il file del CV dell'operaio. L'AI leggerà il PDF confrontandolo con i requisiti estratti sopra. (Costo: 50 crediti).
-                </span>
-              </span>
-            </h2>
-            <form onSubmit={handleAnalyzeNewCv} className="space-y-4">
-              <input 
-                type="text" 
-                placeholder="Nome del candidato" 
-                value={candidateName}
-                onChange={(e) => setCandidateName(e.target.value)}
-                required
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none"
-              />
-              
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const file = e.dataTransfer.files?.[0];
-                  if (file && file.type === "application/pdf") {
-                    setFileName(file.name);
-                    setSelectedFile(file);
-                    if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
-                  }
-                }}
-                className="border-2 border-dashed border-zinc-800 hover:border-emerald-500/40 rounded-xl p-6 text-center cursor-pointer relative bg-zinc-950/40 transition duration-200"
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept=".pdf" 
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setFileName(file.name);
-                      setSelectedFile(file);
-                      if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
-                    }
-                  }}
-                  className="hidden" 
-                />
-                <span className="text-xs text-zinc-400 block font-semibold">
-                  {fileName ? `📄 ${fileName}` : "📁 Trascina o clicca qui per caricare il CV (PDF)"}
-                </span>
-                <span className="text-[10px] text-zinc-500 block mt-1">
-                  {fileName ? "Fai clic per sostituire il file" : "Dimensione max 10MB"}
-                </span>
-              </div>
-
-              <button type="submit" disabled={isAnalyzing || !candidateName || !fileName || !selectedFile} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">
-                {isAnalyzing ? "Confronto in corso..." : "✨ Confronta CV (50 crediti)"}
-              </button>
-            </form>
-          </div>
-
+            </span>
+          </h2>
         </div>
 
-        {/* Tabella dei Risultati */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-            <div className="p-6 border-b border-zinc-800">
-              <h2 className="text-lg font-bold text-white">Candidati Caricati</h2>
+        <p className="text-sm text-zinc-400 leading-relaxed">
+          Incolla l'indirizzo internet dell'annuncio di lavoro da analizzare.
+        </p>
+        
+        <form onSubmit={handleScrapeJobPosting} className="space-y-3">
+          <input 
+            type="url" 
+            placeholder="Esempio: https://github.com/.../elettricista-cantiere.txt" 
+            value={jobUrl}
+            onChange={(e) => setJobUrl(e.target.value)}
+            className="w-full bg-zinc-850 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+          />
+          <button type="submit" disabled={isScraping || !jobUrl} className="w-full md:w-auto py-2.5 px-5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg text-zinc-300 border border-zinc-750 transition-all">
+            {isScraping ? "Lettura pagina..." : "🔍 Scansiona e acquisisci requisiti"}
+          </button>
+        </form>
+
+        {extractedJobTitle && (
+          <div className="bg-zinc-950 border border-zinc-800/80 p-4 rounded-xl space-y-1">
+            <span className="text-xs text-zinc-500 block uppercase font-mono tracking-wider">Figura Rilevata nell'Annuncio:</span>
+            <span className="text-sm text-emerald-400 block font-bold">{extractedJobTitle}</span>
+          </div>
+        )}
+      </div>
+
+      {/* FASE 2: CARICAMENTO DEL CANDIDATO */}
+      <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4 shadow-xl">
+        <div className="flex items-center space-x-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 text-sm">
+            2
+          </span>
+          <h2 className="text-lg font-bold text-white flex items-center">
+            Fase 2: Seleziona e analizza il candidato
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
+              ℹ️
+              <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
+                Carica il file del CV dell'operaio in PDF. L'AI lo confronterà con l'annuncio sopra configurato. (Costo: 50 crediti).
+              </span>
+            </span>
+          </h2>
+        </div>
+
+        <p className="text-sm text-zinc-400 leading-relaxed">
+          Associa il curriculum in PDF al candidato che desideri valutare.
+        </p>
+
+        <form onSubmit={handleAnalyzeNewCv} className="space-y-4">
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1.5 uppercase font-mono tracking-wider">Nome del Candidato</label>
+            <input 
+              type="text" 
+              placeholder="Esempio: Mario Rossi" 
+              value={candidateName}
+              onChange={(e) => setCandidateName(e.target.value)}
+              required
+              className="w-full bg-zinc-850 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const file = e.dataTransfer.files?.[0];
+              if (file && file.type === "application/pdf") {
+                setFileName(file.name);
+                setSelectedFile(file);
+                if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
+              }
+            }}
+            className="border-2 border-dashed border-zinc-800 hover:border-emerald-500/30 rounded-xl p-8 text-center cursor-pointer bg-zinc-950/40 hover:bg-zinc-950/60 transition duration-200"
+          >
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              accept=".pdf" 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setFileName(file.name);
+                  setSelectedFile(file);
+                  if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
+                }
+              }}
+              className="hidden" 
+            />
+            <span className="text-2xl block mb-2">📄</span>
+            <span className="text-sm text-zinc-300 block font-semibold">
+              {fileName ? fileName : "Trascina o clicca qui per caricare il CV (PDF)"}
+            </span>
+            <span className="text-xs text-zinc-500 block mt-1">
+              {fileName ? "Fai clic per sostituire il file" : "Dimensione massima consentita: 10MB"}
+            </span>
+          </div>
+
+          <button type="submit" disabled={isAnalyzing || !candidateName || !fileName || !selectedFile} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl transition duration-200 shadow-lg shadow-emerald-950/20 text-sm">
+            {isAnalyzing ? "Analisi e confronto in corso..." : "✨ Avvia Screening AI (Consuma 50 crediti)"}
+          </button>
+        </form>
+      </div>
+
+      {/* RISULTATO DELL'ANALISI SELEZIONATA (RISULTATO CORRENTE) */}
+      {selectedCandidate && (
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl space-y-6 animate-fadeIn shadow-xl">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+            <div>
+              <h3 className="text-2xl font-bold text-white">{selectedCandidate.candidate_name}</h3>
+              <p className="text-sm text-emerald-400">Match con: {selectedCandidate.applied_role}</p>
             </div>
-            
-            {loading ? (
-              <div className="p-10 text-center text-zinc-500">Lettura candidati in corso...</div>
-            ) : candidates.length === 0 ? (
-              <div className="p-10 text-center text-zinc-500 text-sm">Nessuna candidatura registrata su questa ricerca.</div>
-            ) : (
-              <div className="divide-y divide-zinc-800">
-                {candidates.map((c) => (
-                  <div key={c.id} onClick={() => setSelectedCandidate(c)} className="p-6 flex items-center justify-between hover:bg-zinc-800 cursor-pointer transition">
-                    <div>
-                      <h3 className="font-bold text-white">{c.candidate_name}</h3>
-                      <p className="text-xs text-emerald-400 mt-1">Confrontato con: {c.applied_role}</p>
-                    </div>
-                    <div className="flex items-center space-x-6">
-                      <span className="text-xs bg-zinc-800 px-2 py-1 rounded border border-zinc-700 text-zinc-300">{c.status}</span>
-                      {renderStars(c.score)}
-                    </div>
-                  </div>
+            <div className="text-xl">
+              {renderStars(selectedCandidate.score)}
+            </div>
+          </div>
+
+          <div className="p-5 bg-zinc-950 rounded-xl border border-zinc-800/80 text-sm text-zinc-300 leading-relaxed space-y-2">
+            <span className="text-xs text-zinc-500 block uppercase font-mono tracking-wider">Report di Compatibilità AI:</span>
+            <p>{selectedCandidate.ai_analysis_json.job_match_justification}</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div>
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Competenze Rilevate</span>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {selectedCandidate.ai_analysis_json.certifications.map((cert, i) => (
+                  <span key={i} className="px-3 py-1 bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 rounded-lg">
+                    ✓ {cert}
+                  </span>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Dettagli della Valutazione */}
-          {selectedCandidate && (
-            <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl space-y-6 animate-fadeIn">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-                <div>
-                  <h3 className="text-2xl font-bold text-white">{selectedCandidate.candidate_name}</h3>
-                  <p className="text-sm text-emerald-400">Match con: {selectedCandidate.applied_role}</p>
-                </div>
-                <div className="text-xl">
-                  {renderStars(selectedCandidate.score)}
-                </div>
-              </div>
-
-              <div className="p-4 bg-zinc-800 rounded-xl border border-zinc-700 text-sm text-zinc-300 leading-relaxed">
-                <strong>📝 Giustificazione di Corrispondenza AI:</strong><br/>
-                {selectedCandidate.ai_analysis_json.job_match_justification}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Competenze Rilevate</span>
-                  <div className="flex gap-2 flex-wrap mt-2">
-                    {selectedCandidate.ai_analysis_json.certifications.map((cert, i) => (
-                      <span key={i} className="px-3 py-1 bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 rounded-lg">✓ {cert}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Residenza e Logistica</span>
-                  <p className="text-sm text-zinc-300 mt-2">📍 {selectedCandidate.ai_analysis_json.location_proximity}</p>
-                </div>
-              </div>
             </div>
-          )}
+            <div>
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Residenza e Logistica</span>
+              <p className="text-sm text-zinc-300 mt-2 leading-relaxed">📍 {selectedCandidate.ai_analysis_json.location_proximity}</p>
+            </div>
+          </div>
         </div>
+      )}
 
+      {/* TABELLA DEI RISULTATI (STORICO VALUTAZIONI) */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-zinc-800">
+          <h2 className="text-lg font-bold text-white">Storico delle Valutazioni Completate</h2>
+        </div>
+        
+        {loading ? (
+          <div className="p-10 text-center text-zinc-500 text-sm">Lettura candidati in corso...</div>
+        ) : candidates.length === 0 ? (
+          <div className="p-10 text-center text-zinc-500 text-sm">Nessuna candidatura registrata su questa ricerca.</div>
+        ) : (
+          <div className="divide-y divide-zinc-800">
+            {candidates.map((c) => (
+              <div key={c.id} onClick={() => setSelectedCandidate(c)} className="p-6 flex items-center justify-between hover:bg-zinc-850 cursor-pointer transition duration-200">
+                <div>
+                  <h3 className="font-bold text-white">{c.candidate_name}</h3>
+                  <p className="text-xs text-emerald-400 mt-1">Confrontato con: {c.applied_role}</p>
+                </div>
+                <div className="flex items-center space-x-6">
+                  <span className="text-xs bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-zinc-400">{c.status}</span>
+                  {renderStars(c.score)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
     </div>
   );
 }
