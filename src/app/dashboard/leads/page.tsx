@@ -24,7 +24,6 @@ export default function LeadsCRM() {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  // Form states per nuovo inserimento manuale
   const [showAddModal, setShowAddModal] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -141,7 +140,7 @@ export default function LeadsCRM() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Tabella dei contatti */}
+        {/* Tabella contatti */}
         <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
           <div className="p-6 border-b border-zinc-800">
             <h2 className="text-lg font-bold text-white">Anagrafica Clienti</h2>
@@ -178,7 +177,7 @@ export default function LeadsCRM() {
           )}
         </div>
 
-        {/* Dettaglio Lead ed Azioni Rapide */}
+        {/* Dettaglio Lead */}
         <div>
           {selectedLead ? (
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-6 animate-fadeIn">
@@ -209,7 +208,7 @@ export default function LeadsCRM() {
                   </button>
                   <button 
                     onClick={() => handleUpdateStatus(selectedLead.id, 'chiuso')}
-                    className="flex-1 py-2 bg-emerald-950 text-emerald-400 border border-emerald-800/50 text-xs font-bold rounded-lg hover:bg-emerald-900 transition"
+                    className="flex-1 py-2 bg-emerald-500 text-emerald-400 border border-emerald-800/50 text-xs font-bold rounded-lg hover:bg-emerald-900 transition"
                   >
                     Contratto Chiuso
                   </button>
@@ -236,7 +235,8 @@ export default function LeadsCRM() {
             </div>
           ) : (
             <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl text-center text-zinc-500 text-sm">
-              Seleziona un contatto dalla lista per visualizzarne i dettagli ed attivare le scorciatoie di chiamata e WhatsApp.
+              {/* ETICHETTA CORRETTA ED ALLINEATA AI REALI SERVIZI ATTIVI */}
+              Seleziona un contatto dalla lista per visualizzarne i dettagli e gestire lo stato della trattativa.
             </div>
           )}
         </div>
@@ -291,7 +291,7 @@ export default function LeadsCRM() {
               <button 
                 type="submit"
                 disabled={saving}
-                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition"
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl transition"
               >
                 {saving ? "Salvataggio..." : "💾 Salva Contatto in Anagrafica"}
               </button>
