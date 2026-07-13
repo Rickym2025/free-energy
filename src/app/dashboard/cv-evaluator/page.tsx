@@ -109,7 +109,9 @@ export default function CvEvaluator() {
 
   const handleAnalyzeNewCv = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!candidateName.trim() || !selectedFile || !tenant || isAnalyzing) return;
+    
+    // RIMOSSO !tenant da questa riga di controllo iniziale per prevenire il blocco silenzioso
+    if (!candidateName.trim() || !selectedFile || isAnalyzing) return;
 
     setIsAnalyzing(true);
 
@@ -143,6 +145,11 @@ export default function CvEvaluator() {
     };
 
     try {
+      // Se il tenant non è stato caricato a causa dell'errore 400 di Supabase, forziamo l'errore per andare nel catch
+      if (!tenant) {
+        throw new Error("Dati tenant non disponibili (Supabase offline o non configurato)");
+      }
+
       // Spostato qui dentro: se il portafoglio crediti fallisce per problemi di rete, si attiva il paracadute
       const success = await deductCredits(50, `Screening CV: ${candidateName}`);
       if (!success) {
@@ -276,7 +283,7 @@ export default function CvEvaluator() {
           </span>
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 2: Seleziona e analizza il candidato
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-550 hover:text-emerald-400 text-xs">
               ℹ️
               <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
                 Carica il file del CV dell'operaio in PDF. L'AI lo confronterà con l'annuncio sopra configurato. (Costo: 50 crediti).
@@ -396,7 +403,7 @@ export default function CvEvaluator() {
         ) : (
           <div className="divide-y divide-zinc-800">
             {candidates.map((c) => (
-              <div key={c.id} onClick={() => setSelectedCandidate(c)} className="p-6 flex items-center justify-between hover:bg-zinc-850 cursor-pointer transition duration-200">
+              <div key={c.id} onClick={() => setSelectedCandidate(c)} className="p-6 flex items-center justify-between hover:bg-zinc-855 cursor-pointer transition duration-200">
                 <div>
                   <h3 className="font-bold text-white">{c.candidate_name}</h3>
                   <p className="text-xs text-emerald-400 mt-1">Confrontato con: {c.applied_role}</p>
