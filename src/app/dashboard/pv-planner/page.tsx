@@ -17,6 +17,7 @@ interface SavedRoof {
   points: Coordinate[];
   area: number;
   panelCount: number;
+  lengths: number[]; // Memorizza le lunghezze dei lati
 }
 
 export default function PvPlanner() {
@@ -33,7 +34,7 @@ export default function PvPlanner() {
   const [panelRotation, setPanelRotation] = useState(0); 
   const [mapCenter, setMapCenter] = useState<Coordinate | null>(null);
 
-  // Configurazione dei parametri economici
+  // Parametri economici
   const [costPerPanel, setCostPerPanel] = useState(450); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
@@ -95,12 +96,21 @@ export default function PvPlanner() {
     const pHeight = tenant?.panel_height_m || 1.0;
     const panelCount = calculatePanelCount(currentPoints, pWidth, pHeight, panelRotation);
 
+    // Calcola e memorizza le lunghezze reali dei lati (in metri)
+    const lengths: number[] = [];
+    for (let i = 0; i < currentPoints.length; i++) {
+      const p1 = currentPoints[i];
+      const p2 = currentPoints[(i + 1) % currentPoints.length];
+      lengths.push(calculateDistanceMeters(p1, p2));
+    }
+
     const newRoof: SavedRoof = {
       id: roofId,
       name: `Area Tetto #${savedRoofs.length + 1}`,
       points: currentPoints,
       area,
-      panelCount
+      panelCount,
+      lengths
     };
 
     setSavedRoofs(prev => [...prev, newRoof]);
@@ -108,12 +118,7 @@ export default function PvPlanner() {
   };
 
   const handlePanelDeleted = (roofId: string) => {
-    setSavedRoofs(prev => prev.map(r => {
-      if (r.id === roofId) {
-        return { ...r, panelCount: Math.max(0, r.panelCount - 1) };
-      }
-      return r;
-    }));
+    setSavedRoofs(prev => prev.map(r => r.id === roofId ? { ...r, panelCount: Math.max(0, r.panelCount - 1) } : r));
   };
 
   const handleDeleteRoof = (id: string) => {
@@ -121,9 +126,16 @@ export default function PvPlanner() {
   };
 
   const handleRenameRoof = (id: string, newName: string) => {
+    setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
+  };
+
+  // Funzione per aggiornare manualmente la lunghezza dei lati dall'input dell'utente
+  const handleUpdateLength = (id: string, index: number, newVal: number) => {
     setSavedRoofs(prev => prev.map(r => {
       if (r.id === id) {
-        return { ...r, name: newName };
+        const nextLengths = [...r.lengths];
+        nextLengths[index] = newVal;
+        return { ...r, lengths: nextLengths };
       }
       return r;
     }));
@@ -200,8 +212,6 @@ export default function PvPlanner() {
     }
   };
 
-  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
-
   return (
     <div className="space-y-8">
       {/* Intestazione di Stampa */}
@@ -235,7 +245,8 @@ export default function PvPlanner() {
           monthlyBill={monthlyBill} setMonthlyBill={setMonthlyBill}
           onSearchSubmit={handleSearch} onUndoPoint={handleUndoLastPoint}
           onSaveRoof={handleSaveCurrentRoof} onDeleteRoof={handleDeleteRoof}
-          onRenameRoof={handleRenameRoof} onGenerateReport={handleGenerateReport}
+          onRenameRoof={handleRenameRoof} onUpdateLength={handleUpdateLength}
+          onGenerateReport={handleGenerateReport}
           onResetPlanner={handleResetPlanner}
         />
 
@@ -272,7 +283,6 @@ export default function PvPlanner() {
   );
 }
 
-// Spostati all'esterno del componente per risolvere l'hoisting
 function calculateAreaInSqm(points: Coordinate[]) {
   if (points.length < 3) return 0;
   const latMid = points[0].lat * Math.PI / 180;
@@ -283,6 +293,15 @@ function calculateAreaInSqm(points: Coordinate[]) {
     area += meters[i].x * meters[j].y - meters[j].x * meters[i].y;
   }
   return Math.abs(area / 2);
+}
+
+// Funzione geometrica di supporto per calcolare la distanza geodetica reale (in metri) tra due vertici
+function calculateDistanceMeters(p1: Coordinate, p2: Coordinate): number {
+  const rad = Math.PI / 180;
+  const latMid = p1.lat * rad;
+  const dx = (p2.lng - p1.lng) * 111320 * Math.cos(latMid);
+  const dy = (p2.lat - p1.lat) * 110540;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 function calculatePanelCount(points: Coordinate[], panelWidth: number, panelHeight: number, rotation: number): number {
