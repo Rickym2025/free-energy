@@ -14,9 +14,12 @@ interface ChatMessage {
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
   const pathname = usePathname();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Chatbot Solis AI: impostato ad APERTURA AUTOMATICA di default (true)
   const [chatOpen, setChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'init-1', text: "Ciao! Sono Giulia, l'assistente virtuale di Free Energy. Sono qui per aiutarti a configurare la piattaforma e ad usare i moduli al meglio.", sender: 'bot' }
+    { id: 'init-1', text: "Ciao! Sono Solis, l'assistente virtuale ed ingegneristico di Free Energy. Sono qui per aiutarti a tracciare i tuoi capannoni ed attivare i moduli. Come posso esserti utile oggi?", sender: 'bot' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -71,7 +74,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       setMessages(prev => [...prev, { id: 'bot-' + Date.now(), text: reply, sender: 'bot' }]);
     } catch (err) {
-      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Connessione con Giulia temporaneamente offline.', sender: 'bot' }]);
+      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Connessione con Solis temporaneamente offline.', sender: 'bot' }]);
     } finally {
       setIsTyping(false);
     }
@@ -156,7 +159,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                         isActive 
                           ? 'text-white bg-zinc-800/80 font-bold cursor-pointer' 
                           : isLockedAndGreyed 
-                            // CORRETTO: Sostituito cursor-not-allowed con cursor-pointer per visualizzare la manina
                             ? 'text-zinc-650 opacity-40 hover:text-zinc-500 hover:opacity-60 bg-zinc-950/20 font-medium cursor-pointer' 
                             : 'text-zinc-300 hover:text-white hover:bg-zinc-800/30 font-semibold cursor-pointer' 
                       }`} 
@@ -193,7 +195,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
-                <span className="font-bold text-sm text-white">Giulia AI (Assistente)</span>
+                <span className="font-bold text-sm text-white">Solis AI (Assistente)</span>
               </div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white text-lg">✕</button>
             </div>
@@ -203,7 +205,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   {m.text}
                 </div>
               ))}
-              {isTyping && <div className="text-zinc-500 italic">Giulia sta digitando...</div>}
+              {isTyping && <div className="text-zinc-500 italic">Solis sta digitando...</div>}
               <div ref={messagesEndRef} />
             </div>
             
