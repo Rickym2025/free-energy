@@ -16,16 +16,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Chatbot Solis AI: impostato ad APERTURA AUTOMATICA di default (true)
+  // Chatbot Aurora AI: impostato ad APERTURA AUTOMATICA di default (true)
   const [chatOpen, setChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'init-1', text: "Ciao! Sono Solis, l'assistente virtuale ed ingegneristico di Free Energy. Sono qui per aiutarti a tracciare i tuoi capannoni ed attivare i moduli. Come posso esserti utile oggi?", sender: 'bot' }
+    { id: 'init-1', text: "Ciao! Sono Aurora, l'assistente virtuale ed ingegneristico di Free Energy. Sono qui per aiutarti a tracciare i tuoi capannoni ed attivare i moduli. Come posso esserti utile oggi?", sender: 'bot' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
+  // CORRETTO: Inserito l'indirizzo del webhook di Aurora AI
+  const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/aurora-chatbot';
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -74,12 +75,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       setMessages(prev => [...prev, { id: 'bot-' + Date.now(), text: reply, sender: 'bot' }]);
     } catch (err) {
-      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Connessione con Solis temporaneamente offline.', sender: 'bot' }]);
+      setMessages(prev => [...prev, { id: 'bot-err-' + Date.now(), text: 'Connessione con Aurora temporaneamente offline.', sender: 'bot' }]);
     } finally {
       setIsTyping(false);
     }
   };
 
+  // Suddivisione strategica dei menu per aree operative e colori distintivi
   const sidebarGroups = [
     {
       title: "Produzione & CRM",
@@ -188,14 +190,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Chatbot Galleggiante */}
+      {/* Chatbot Galleggiante Aurora AI */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
         {chatOpen && (
           <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
             <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
-                <span className="font-bold text-sm text-white">Solis AI (Assistente)</span>
+                <span className="font-bold text-sm text-white">Aurora AI (Assistente)</span>
               </div>
               <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white text-lg">✕</button>
             </div>
@@ -205,7 +207,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   {m.text}
                 </div>
               ))}
-              {isTyping && <div className="text-zinc-500 italic">Solis sta digitando...</div>}
+              {isTyping && <div className="text-zinc-500 italic">Aurora sta digitando...</div>}
               <div ref={messagesEndRef} />
             </div>
             
