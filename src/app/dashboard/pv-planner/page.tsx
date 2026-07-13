@@ -34,7 +34,7 @@ export default function PvPlanner() {
   const [panelRotation, setPanelRotation] = useState(0); 
   const [mapCenter, setMapCenter] = useState<Coordinate | null>(null);
 
-  // Parametri economici
+  // Configurazione dei parametri economici
   const [costPerPanel, setCostPerPanel] = useState(450); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
@@ -75,7 +75,6 @@ export default function PvPlanner() {
     setCurrentPoints(prev => [...prev, point]);
   };
 
-  // Aggiorna lo stato dei punti quando un pin viene trascinato sulla mappa satellitare
   const handleMarkerDrag = (index: number, newCoord: Coordinate) => {
     setCurrentPoints(prev => prev.map((p, idx) => idx === index ? newCoord : p));
   };
@@ -130,15 +129,19 @@ export default function PvPlanner() {
   };
 
   const handleRenameRoof = (id: string, newName: string) => {
-    setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === id) {
+        return { ...r, name: newName };
+      }
+      return r;
+    }));
   };
 
-  // AGGIORNATO: Proporzionalità geometrica che allinea mq e numero di moduli modificando i lati
   const handleUpdateLength = (id: string, index: number, newVal: number) => {
     setSavedRoofs(prev => prev.map(r => {
       if (r.id === id) {
         const oldVal = r.lengths[index] || 1;
-        const ratio = newVal / oldVal; // Fattore di scala proporzionale
+        const ratio = newVal / oldVal;
         const nextLengths = [...r.lengths];
         nextLengths[index] = newVal;
 
@@ -146,7 +149,7 @@ export default function PvPlanner() {
           ...r,
           lengths: nextLengths,
           area: Math.max(1, r.area * ratio),
-          panelCount: Math.max(0, Math.round(r.panelCount * ratio)) // Ricalcola i moduli attivi
+          panelCount: Math.max(0, Math.round(r.panelCount * ratio))
         };
       }
       return r;
@@ -200,6 +203,12 @@ export default function PvPlanner() {
     clearMapPoints();
     setSavedRoofs([]);
     setIsCalculated(false);
+    
+    // CORRETTO: Pulisce esplicitamente i riferimenti delle quote residue a schermo
+    if (typeof window !== 'undefined' && (window as any).tempLengthMarkers) {
+      (window as any).tempLengthMarkers.forEach((m: any) => m.remove());
+      (window as any).tempLengthMarkers = [];
+    }
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -273,7 +282,7 @@ export default function PvPlanner() {
             mapCenter={mapCenter}
             onMapClick={handleMapClick}
             onPanelDeleted={handlePanelDeleted}
-            onMarkerDrag={handleMarkerDrag} // Passaggio del callback per i pin trascinabili
+            onMarkerDrag={handleMarkerDrag}
           />
         </div>
       </div>
@@ -296,7 +305,6 @@ export default function PvPlanner() {
   );
 }
 
-// Spostati all'esterno del componente per risolvere l'hoisting
 function calculateAreaInSqm(points: Coordinate[]) {
   if (points.length < 3) return 0;
   const latMid = points[0].lat * Math.PI / 180;
