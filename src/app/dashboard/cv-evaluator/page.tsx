@@ -207,7 +207,7 @@ export default function CvEvaluator() {
       {/* INTESTAZIONE */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-white">Screening Professionale CV</h1>
-        <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
+        <p className="text-zinc-450 mt-2 text-sm leading-relaxed">
           Confronta all'istante il profilo di un candidato con i requisiti del tuo annuncio di lavoro tramite intelligenza artificiale.
         </p>
       </div>
@@ -220,7 +220,7 @@ export default function CvEvaluator() {
           </span>
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 1: Configura i requisiti dell'annuncio
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-550 hover:text-emerald-400 text-xs">
               ℹ️
               <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
                 Incolla l'URL di un annuncio web attivo. n8n leggerà la pagina web per isolarne la figura e le competenze richieste.
@@ -239,15 +239,15 @@ export default function CvEvaluator() {
             placeholder="Esempio: https://github.com/.../elettricista-cantiere.txt" 
             value={jobUrl}
             onChange={(e) => setJobUrl(e.target.value)}
-            className="w-full bg-zinc-850 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
           />
-          <button type="submit" disabled={isScraping || !jobUrl} className="w-full md:w-auto py-2.5 px-5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg text-zinc-300 border border-zinc-750 transition-all">
+          <button type="submit" disabled={isScraping || !jobUrl} className="w-full md:w-auto py-2.5 px-5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs font-semibold rounded-lg text-zinc-300 border border-zinc-700 transition-all">
             {isScraping ? "Lettura pagina..." : "🔍 Scansiona e acquisisci requisiti"}
           </button>
         </form>
 
         {extractedJobTitle && (
-          <div className="bg-zinc-950 border border-zinc-800/80 p-4 rounded-xl space-y-1">
+          <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl space-y-1">
             <span className="text-xs text-zinc-500 block uppercase font-mono tracking-wider">Figura Rilevata nell'Annuncio:</span>
             <span className="text-sm text-emerald-400 block font-bold">{extractedJobTitle}</span>
           </div>
@@ -262,7 +262,7 @@ export default function CvEvaluator() {
           </span>
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 2: Seleziona e analizza il candidato
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-550 hover:text-emerald-400 text-xs">
               ℹ️
               <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
                 Carica il file del CV dell'operaio in PDF. L'AI lo confronterà con l'annuncio sopra configurato. (Costo: 50 crediti).
@@ -284,7 +284,7 @@ export default function CvEvaluator() {
               value={candidateName}
               onChange={(e) => setCandidateName(e.target.value)}
               required
-              className="w-full bg-zinc-850 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
           
@@ -301,7 +301,7 @@ export default function CvEvaluator() {
                 if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
               }
             }}
-            className="border-2 border-dashed border-zinc-800 hover:border-emerald-500/30 rounded-xl p-8 text-center cursor-pointer bg-zinc-950/40 hover:bg-zinc-950/60 transition duration-200"
+            className="border-2 border-dashed border-zinc-800 hover:border-emerald-500/30 rounded-xl p-8 text-center cursor-pointer bg-zinc-950 hover:bg-zinc-900 transition duration-200"
           >
             <input 
               type="file" 
@@ -326,7 +326,7 @@ export default function CvEvaluator() {
             </span>
           </div>
 
-          <button type="submit" disabled={isAnalyzing || !candidateName || !fileName || !selectedFile} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl transition duration-200 shadow-lg shadow-emerald-950/20 text-sm">
+          <button type="submit" disabled={isAnalyzing || !candidateName || !fileName || !selectedFile} className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl transition duration-200 shadow-lg shadow-emerald-950/20 text-sm py-3.5">
             {isAnalyzing ? "Analisi e confronto in corso..." : "✨ Avvia Screening AI (Consuma 50 crediti)"}
           </button>
         </form>
@@ -345,7 +345,7 @@ export default function CvEvaluator() {
             </div>
           </div>
 
-          <div className="p-5 bg-zinc-950 rounded-xl border border-zinc-800/80 text-sm text-zinc-300 leading-relaxed space-y-2">
+          <div className="p-5 bg-zinc-950 rounded-xl border border-zinc-800 text-sm text-zinc-300 leading-relaxed space-y-2">
             <span className="text-xs text-zinc-500 block uppercase font-mono tracking-wider">Report di Compatibilità AI:</span>
             <p>{selectedCandidate.ai_analysis_json.job_match_justification}</p>
           </div>
@@ -362,8 +362,8 @@ export default function CvEvaluator() {
               </div>
             </div>
             <div>
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Residenza e Logistica</span>
-              <p className="text-sm text-zinc-300 mt-2 leading-relaxed">📍 {selectedCandidate.ai_analysis_json.location_proximity}</p>
+              <span className="text-xs font-bold text-zinc-450 uppercase tracking-wider block">Residenza e Logistica</span>
+              <p className="text-sm text-zinc-300 mt-2 leading-relaxed font-semibold">📍 {selectedCandidate.ai_analysis_json.location_proximity}</p>
             </div>
           </div>
         </div>
@@ -388,7 +388,7 @@ export default function CvEvaluator() {
                   <p className="text-xs text-emerald-400 mt-1">Confrontato con: {c.applied_role}</p>
                 </div>
                 <div className="flex items-center space-x-6">
-                  <span className="text-xs bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-zinc-400">{c.status}</span>
+                  <span className="text-xs bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-zinc-450">{c.status}</span>
                   {renderStars(c.score)}
                 </div>
               </div>
