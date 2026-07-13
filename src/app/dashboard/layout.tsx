@@ -146,8 +146,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <div className="space-y-1">
                 {group.items.map((item: any) => {
                   const isActive = pathname === item.href;
-                  
-                  // Se il modulo Premium è BLOCCATO, viene visualizzato "grayed-out" (grigio desaturato opaco 40%)
                   const isLockedAndGreyed = item.addon && !item.active;
 
                   return (
@@ -156,10 +154,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                       href={item.href} 
                       className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition ${
                         isActive 
-                          ? 'text-white bg-zinc-800/80 font-bold' // Collegamento Attivo/Selezionato
+                          ? 'text-white bg-zinc-800/80 font-bold cursor-pointer' 
                           : isLockedAndGreyed 
-                            ? 'text-zinc-650 opacity-40 hover:text-zinc-500 hover:opacity-60 bg-zinc-950/20 font-medium cursor-not-allowed' // Collegamento Bloccato
-                            : 'text-zinc-300 hover:text-white hover:bg-zinc-800/30 font-semibold' // Collegamento Ordinario Attivo
+                            // CORRETTO: Sostituito cursor-not-allowed con cursor-pointer per visualizzare la manina
+                            ? 'text-zinc-650 opacity-40 hover:text-zinc-500 hover:opacity-60 bg-zinc-950/20 font-medium cursor-pointer' 
+                            : 'text-zinc-300 hover:text-white hover:bg-zinc-800/30 font-semibold cursor-pointer' 
                       }`} 
                       style={isActive ? { borderLeft: `3px solid ${brandColor}` } : {}}
                     >
