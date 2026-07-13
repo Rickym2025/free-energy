@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+// CORRETTO: Importato useRef per sbloccare la build di Vercel
+import React, { useEffect, useState, useRef } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 import MapPlanner from '@/components/MapPlanner';
 import ReportPreview from '@/components/ReportPreview';
@@ -47,28 +48,6 @@ export default function PvPlanner() {
   const [monthlyBill, setMonthlyBill] = useState('600');
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => {
-      initializeMap();
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      link.remove();
-      script.remove();
-    };
-  }, []);
-
-  useEffect(() => {
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
 
@@ -81,75 +60,17 @@ export default function PvPlanner() {
     }));
   }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
 
-  const initializeMap = () => {
-    const L = (window as any).L;
-    if (!L) return;
-
-    const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
-    mapRef.current = map;
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 22,
-      maxNativeZoom: 19,
-      attribution: 'Esri, Maxar'
-    }).addTo(map);
-
-    map.on('click', (e: any) => {
-      const { lat, lng } = e.latlng;
-      addPolygonPoint({ lat, lng });
-    });
-  };
-
-  const mapRef = useRef<any>(null);
-  const activeMarkersRef = useRef<any[]>([]);
-  const activePolygonRef = useRef<any>(null);
-
-  const addPolygonPoint = (point: Coordinate) => {
-    const L = (window as any).L;
-    if (!L || isCalculated) return;
-
-    setCurrentPoints(prev => {
-      const updated = [...prev, point];
-      const marker = L.marker([point.lat, point.lng]).addTo(mapRef.current);
-      activeMarkersRef.current.push(marker);
-
-      if (activePolygonRef.current) {
-        activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
-      } else {
-        activePolygonRef.current = L.polygon(updated.map(p => [p.lat, p.lng]), { color: brandColor, fillOpacity: 0.25 }).addTo(mapRef.current);
-      }
-
-      return updated;
-    });
+  const handleMapClick = (point: Coordinate) => {
+    if (isCalculated) return;
+    setCurrentPoints(prev => [...prev, point]);
   };
 
   const handleUndoLastPoint = () => {
-    if (currentPoints.length === 0) return;
-    setCurrentPoints(prev => {
-      const updated = prev.slice(0, -1);
-      const lastMarker = activeMarkersRef.current.pop();
-      if (lastMarker) lastMarker.remove();
-
-      if (activePolygonRef.current) {
-        if (updated.length >= 3) {
-          activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
-        } else {
-          activePolygonRef.current.remove();
-          activePolygonRef.current = null;
-        }
-      }
-      return updated;
-    });
+    setCurrentPoints(prev => prev.slice(0, -1));
   };
 
   const clearMapPoints = () => {
     setCurrentPoints([]);
-    activeMarkersRef.current.forEach(m => m.remove());
-    activeMarkersRef.current = [];
-    if (activePolygonRef.current) {
-      activePolygonRef.current.remove();
-      activePolygonRef.current = null;
-    }
   };
 
   const handleSaveCurrentRoof = () => {
@@ -191,7 +112,12 @@ export default function PvPlanner() {
   };
 
   const handleRenameRoof = (id: string, newName: string) => {
-    setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === id) {
+        return { ...r, name: newName };
+      }
+      return r;
+    }));
   };
 
   const handleGenerateReport = async () => {
@@ -269,13 +195,6 @@ export default function PvPlanner() {
     }
   };
 
-  const handleMapClick = (point: Coordinate) => {
-    if (isCalculated) return;
-    setCurrentPoints(prev => [...prev, point]);
-  };
-
-  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
-
   return (
     <div className="space-y-8">
       <div className="print:hidden">
@@ -295,7 +214,7 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Slider di rotazione manuale */}
+          {/* Slider di rotazione manual */}
           <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
@@ -371,11 +290,10 @@ export default function PvPlanner() {
 
           <div className="space-y-2 border-t border-zinc-800 pt-4">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bolletta Elettrica Presunta (€/Mese)</label>
-            <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
+            <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2.5 rounded-lg mt-1" />
           </div>
 
           <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800">
-            {/* AGGIORNATO IL COSTO DEI CREDITI NELLA CALL TO ACTION */}
             <button onClick={handleGenerateReport} className="w-full py-4 bg-emerald-500 text-zinc-950 font-bold rounded-xl text-sm transition">
               🚀 Genera Preventivo Totale (150 crediti)
             </button>
