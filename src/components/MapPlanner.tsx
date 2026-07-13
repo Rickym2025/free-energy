@@ -41,7 +41,7 @@ export default function MapPlanner({
 
   const [mapReady, setMapReady] = useState(false);
   const [osm3dActive, setOsm3dActive] = useState(false); 
-  const osm3dLayerRef = useRef<any>(null);
+  const osm3dLayerInstanceRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -58,15 +58,16 @@ export default function MapPlanner({
     `;
     document.head.appendChild(styleEl);
 
+    // Carica Leaflet CSS e JS
     const L = (window as any).L;
     if (L) {
-      initializeMap();
+      loadOsmBuildingsScript();
     } else {
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.async = true;
       script.onload = () => {
-        initializeMap();
+        loadOsmBuildingsScript();
       };
       document.body.appendChild(script);
     }
@@ -75,6 +76,23 @@ export default function MapPlanner({
       styleEl.remove();
     };
   }, []);
+
+  // Caricamento asincrono e integrato di OSM Buildings Classic
+  const loadOsmBuildingsScript = () => {
+    const OSMBuildings = (window as any).OSMBuildings;
+    if (OSMBuildings) {
+      initializeMap();
+    } else {
+      const script3d = document.createElement('script');
+      // Carica la libreria ufficiale ed unificata di OSM Buildings per Leaflet
+      script3d.src = 'https://cdn.osmbuildings.org/classic/0.2.2b/OSMBuildings-Leaflet.js';
+      script3d.async = true;
+      script3d.onload = () => {
+        initializeMap();
+      };
+      document.body.appendChild(script3d);
+    }
+  };
 
   useEffect(() => {
     const L = (window as any).L;
@@ -169,23 +187,22 @@ export default function MapPlanner({
     });
   };
 
+  // Attiva l'estrusione 3D vettoriale semitrasparente dei capannoni direttamente sopra il satellite
   const handleToggle3D = () => {
-    const L = (window as any).L;
-    if (!L || !mapRef.current) return;
+    const OSMBuildings = (window as any).OSMBuildings;
+    if (!OSMBuildings || !mapRef.current) return;
 
     const nextState = !osm3dActive;
     setOsm3dActive(nextState);
 
     if (nextState) {
-      // CORRETTO: Sostituito l'endpoint offline con il server ufficiale di CartoDB Voyager per il disegno dei palazzi in 3D
-      osm3dLayerRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        opacity: 0.45,
-        maxZoom: 22
-      }).addTo(mapRef.current);
+      // Inizializza il motore 3D e carica l'estrusione dei palazzi in trasparenza
+      osm3dLayerInstanceRef.current = new OSMBuildings(mapRef.current).load('https://{s}.data.osmbuildings.org/0.2/59fcc2e8/tile/{z}/{x}/{y}.json');
     } else {
-      if (osm3dLayerRef.current) {
-        osm3dLayerRef.current.remove();
-        osm3dLayerRef.current = null;
+      if (osm3dLayerInstanceRef.current) {
+        // Rimuove lo strato 3D in modo pulito
+        osm3dLayerInstanceRef.current.destroy();
+        osm3dLayerInstanceRef.current = null;
       }
     }
   };
