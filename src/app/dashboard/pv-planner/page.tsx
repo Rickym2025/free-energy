@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 import MapPlanner from '@/components/MapPlanner';
 import ReportPreview from '@/components/ReportPreview';
@@ -46,28 +46,7 @@ export default function PvPlanner() {
   const [estimatedCost, setEstimatedCost] = useState(0);
   const [monthlyBill, setMonthlyBill] = useState('600');
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => {
-      initializeMap();
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      link.remove();
-      script.remove();
-    };
-  }, []);
-
+  // Ricalcola istantaneamente i pannelli di tutte le aree ad ogni scatto dello slider
   useEffect(() => {
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
@@ -81,75 +60,17 @@ export default function PvPlanner() {
     }));
   }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
 
-  const initializeMap = () => {
-    const L = (window as any).L;
-    if (!L) return;
-
-    const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
-    mapRef.current = map;
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 22,
-      maxNativeZoom: 19,
-      attribution: 'Esri, Maxar'
-    }).addTo(map);
-
-    map.on('click', (e: any) => {
-      const { lat, lng } = e.latlng;
-      addPolygonPoint({ lat, lng });
-    });
-  };
-
-  const mapRef = useRef<any>(null);
-  const activeMarkersRef = useRef<any[]>([]);
-  const activePolygonRef = useRef<any>(null);
-
-  const addPolygonPoint = (point: Coordinate) => {
-    const L = (window as any).L;
-    if (!L || isCalculated) return;
-
-    setCurrentPoints(prev => {
-      const updated = [...prev, point];
-      const marker = L.marker([point.lat, point.lng]).addTo(mapRef.current);
-      activeMarkersRef.current.push(marker);
-
-      if (activePolygonRef.current) {
-        activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
-      } else {
-        activePolygonRef.current = L.polygon(updated.map(p => [p.lat, p.lng]), { color: brandColor, fillOpacity: 0.25 }).addTo(mapRef.current);
-      }
-
-      return updated;
-    });
+  const handleMapClick = (point: Coordinate) => {
+    if (isCalculated) return;
+    setCurrentPoints(prev => [...prev, point]);
   };
 
   const handleUndoLastPoint = () => {
-    if (currentPoints.length === 0) return;
-    setCurrentPoints(prev => {
-      const updated = prev.slice(0, -1);
-      const lastMarker = activeMarkersRef.current.pop();
-      if (lastMarker) lastMarker.remove();
-
-      if (activePolygonRef.current) {
-        if (updated.length >= 3) {
-          activePolygonRef.current.setLatLngs(updated.map(p => [p.lat, p.lng]));
-        } else {
-          activePolygonRef.current.remove();
-          activePolygonRef.current = null;
-        }
-      }
-      return updated;
-    });
+    setCurrentPoints(prev => prev.slice(0, -1));
   };
 
   const clearMapPoints = () => {
     setCurrentPoints([]);
-    activeMarkersRef.current.forEach(m => m.remove());
-    activeMarkersRef.current = [];
-    if (activePolygonRef.current) {
-      activePolygonRef.current.remove();
-      activePolygonRef.current = null;
-    }
   };
 
   const handleSaveCurrentRoof = () => {
@@ -200,12 +121,21 @@ export default function PvPlanner() {
       return;
     }
 
+    // 1. Calcolo geometrico e accorpamento dati di tetti e moduli reali (Eseguito subito prima delle chiamate di rete)
     const totalArea = savedRoofs.reduce((acc, r) => acc + r.area, 0);
     setTotalAreaSqm(totalArea);
 
     const totalActualPanels = savedRoofs.reduce((acc, r) => acc + r.panelCount, 0);
     const estimPeakPower = totalActualPanels * 0.430; 
     setPeakPower(estimPeakPower);
+
+    // Calcolo preventivo finanziario esatto dell'installatore
+    let costTotal = (estimPeakPower * costPerKwp) + fixedCosts;
+    if (includeStorage) {
+      costTotal += (storageCapacity * costPerKwhStorage);
+    }
+    const finalCostCalculated = Math.round(costTotal);
+    setEstimatedCost(finalCostCalculated);
 
     const success = await deductCredits(150, `Studio di Fattibilità Industriale (${savedRoofs.length} falde): ${address}`);
     if (!success) return;
@@ -218,14 +148,10 @@ export default function PvPlanner() {
       const productionVal = data.outputs?.totals?.fixed?.E_y || (estimPeakPower * 1350);
       setAnnualProduction(productionVal);
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, productionVal * 0.25));
-
-      let costTotal = (estimPeakPower * costPerKwp) + fixedCosts;
-      if (includeStorage) {
-        costTotal += (storageCapacity * costPerKwhStorage);
-      }
-      setEstimatedCost(Math.round(costTotal));
       setIsCalculated(true);
     } catch (err) {
+      // Fallback in caso di blocco CORS di PVGIS: i calcoli monetari rimangono corretti
+      console.warn("Calcolo locale di fallback energetico");
       const localProductionEstimate = estimPeakPower * 1350;
       setAnnualProduction(localProductionEstimate);
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, localProductionEstimate * 0.25));
@@ -267,13 +193,6 @@ export default function PvPlanner() {
     }
   };
 
-  const handleMapClick = (point: Coordinate) => {
-    if (isCalculated) return;
-    setCurrentPoints(prev => [...prev, point]);
-  };
-
-  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
-
   return (
     <div className="space-y-8">
       <div className="print:hidden">
@@ -286,7 +205,6 @@ export default function PvPlanner() {
         {/* Barra di comando */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
-            {/* ETICHETTA AGGIORNATA */}
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Disegna impianto</label>
             <div className="flex gap-2">
               <input type="text" placeholder="Es: Zona Industriale, Frosinone" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
@@ -332,7 +250,7 @@ export default function PvPlanner() {
             </div>
           )}
 
-          {/* Parametri Economici - ETICHETTA AGGIORNATA */}
+          {/* Parametri Economici */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Preventivo costi impianto</span>
             <div className="space-y-3">
@@ -368,7 +286,6 @@ export default function PvPlanner() {
             </div>
           </div>
 
-          {/* ETICHETTA AGGIORNATA */}
           <div className="space-y-2 border-t border-zinc-800 pt-4">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bolletta Elettrica Presunta (€/Mese)</label>
             <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
