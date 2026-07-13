@@ -15,9 +15,11 @@ interface MapPlannerProps {
   currentPoints: Coordinate[];
   savedRoofs: any[];
   mapCenter: Coordinate | null;
+  selectedRoofId: string | null; // Riceve l'area selezionata dal sidebar
   onMapClick: (point: Coordinate) => void;
-  onPanelDeleted: (roofId: string) => void;
+  onPanelDeleted: (roofId: string, panelKey: string) => void; // Supporta la chiave univoca
   onMarkerDrag: (index: number, newCoord: Coordinate) => void;
+  onSavedRoofMarkerDrag: (roofId: string, index: number, newCoord: Coordinate) => void; // Trascina punti salvati
 }
 
 export default function MapPlanner({
@@ -28,9 +30,11 @@ export default function MapPlanner({
   currentPoints,
   savedRoofs,
   mapCenter,
+  selectedRoofId,
   onMapClick,
   onPanelDeleted,
-  onMarkerDrag
+  onMarkerDrag,
+  onSavedRoofMarkerDrag
 }: MapPlannerProps) {
   const mapRef = useRef<any>(null);
   const activeMarkersRef = useRef<any[]>([]);
@@ -74,7 +78,7 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Aggiorna reattivamente tetti, moduli e quote metriche allineate
+  // Aggiorna tetti, moduli e quote metriche allineate
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -83,15 +87,32 @@ export default function MapPlanner({
     if (panelsLayerGroupRef.current) panelsLayerGroupRef.current.clearLayers();
 
     savedRoofs.forEach(roof => {
+      const isSelected = selectedRoofId === roof.id;
+
       L.polygon(roof.points.map((p: Coordinate) => [p.lat, p.lng]), {
-        color: '#10b981',
-        fillOpacity: 0.25
+        color: isSelected ? brandColor : '#10b981', // Evidenzia l'area selezionata con il colore del brand
+        fillOpacity: isSelected ? 0.4 : 0.25,
+        weight: isSelected ? 3 : 2
       }).addTo(savedRoofsLayerGroupRef.current);
 
-      drawPanelsForRoof(roof.points, roof.id);
+      // Disegna i moduli fotovoltaici all'interno
+      drawPanelsForRoof(roof.points, roof.id, roof.deletedPanels || []);
+
+      // Disegna le quotature metriche
       drawSegmentLengths(roof.points, savedRoofsLayerGroupRef.current, false, roof.lengths);
+
+      // CORRETTO: Se l'area è selezionata nel sidebar, disegna i pin d'angolo in modalità DRAGGABLE per poterla de-formare!
+      if (isSelected) {
+        roof.points.forEach((p: Coordinate, idx: number) => {
+          const marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(savedRoofsLayerGroupRef.current);
+          marker.on('dragend', (e: any) => {
+            const newLatLng = e.target.getLatLng();
+            onSavedRoofMarkerDrag(roof.id, idx, { lat: newLatLng.lat, lng: newLatLng.lng });
+          });
+        });
+      }
     });
-  }, [panelRotation, savedRoofs, mapReady]);
+  }, [panelRotation, savedRoofs, mapReady, selectedRoofId]);
 
   // Gestione dinamica dei segnaposto e del poligono in disegno corrente
   useEffect(() => {
@@ -212,7 +233,7 @@ export default function MapPlanner({
     }
   };
 
-  const drawPanelsForRoof = (points: Coordinate[], roofId: string) => {
+  const drawPanelsForRoof = (points: Coordinate[], roofId: string, deletedPanels: string[]) => {
     const L = (window as any).L;
     if (!L || points.length < 3) return;
 
@@ -239,6 +260,12 @@ export default function MapPlanner({
 
     for (let lx = minX; lx < maxX; lx += panelWidth) {
       for (let ly = minY; ly < maxY; ly += panelHeight) {
+        // CORRETTO: Chiave identificativa cartesiana del modulo
+        const panelKey = `${lx.toFixed(1)}_${ly.toFixed(1)}`;
+        
+        // Se l'utente lo ha escluso precedentemente col clic, salta ed evita il disegno!
+        if (deletedPanels.includes(panelKey)) continue;
+
         const c1 = { x: lx + panelWidth * 0.05, y: ly + panelHeight * 0.05 };
         const c2 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.05 };
         const c3 = { x: lx + panelWidth * 0.95, y: ly + panelHeight * 0.95 };
@@ -265,7 +292,9 @@ export default function MapPlanner({
           panel.on('click', (e: any) => {
             L.DomEvent.stopPropagation(e);
             panel.remove();
-            onPanelDeleted(roofId);
+            
+            // Passa l'ID del tetto e la chiave del modulo eliminato al genitore
+            onPanelDeleted(roofId, panelKey);
           });
         }
       }
