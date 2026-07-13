@@ -2,8 +2,20 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
+// Funzioni di sanificazione per evitare errori di copiatura (spazi, virgolette, slash finali)
+const sanitizeUrl = (url: string) => {
+  return url.replace(/^["']|["']$/g, '').trim().replace(/\/$/, '');
+};
+
+const sanitizeKey = (key: string) => {
+  return key.replace(/^["']|["']$/g, '').trim();
+};
+
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
+const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
+
+const SUPABASE_URL = sanitizeUrl(rawUrl);
+const SUPABASE_ANON_KEY = sanitizeKey(rawKey);
 
 export interface Tenant {
   id: string;
@@ -127,7 +139,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation' // Forza Supabase a restituire la riga appena creata
         },
         body: JSON.stringify(demoPayload)
       });
@@ -146,7 +159,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Errore durante la creazione del tenant demo:", e);
     }
   };
 
