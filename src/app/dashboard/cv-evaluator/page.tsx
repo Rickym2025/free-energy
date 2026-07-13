@@ -29,9 +29,10 @@ export default function CvEvaluator() {
   const [loading, setLoading] = useState(true);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
 
-  // Riferimento all'input di file nascosto per aprire l'esplora risorse
+  // Gestione file locali per l'uploader
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // States per scraping annuncio ed analisi CV
   const [jobUrl, setJobUrl] = useState('');
@@ -83,10 +84,9 @@ export default function CvEvaluator() {
         setExtractedJobTitle(data.title || "Profilo Estratto da Link");
         setExtractedSkills(data.mandatory_skills || ["PES/PAV", "Certificato PLE"]);
       } else {
-        throw new Error("Avvio Fallback offline per test");
+        throw new Error("Fallback offline");
       }
     } catch (err) {
-      // Fallback in caso di blocco CORS di n8n: il sistema compila comunque i dati di test
       setTimeout(() => {
         setExtractedJobTitle("Installatore Meccanico Fotovoltaico");
         setExtractedSkills(["Montaggio strutture", "Sicurezza Lavori in Quota", "PLE"]);
@@ -98,61 +98,59 @@ export default function CvEvaluator() {
 
   const handleAnalyzeNewCv = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!candidateName.trim()) return;
+    if (!candidateName.trim() || !selectedFile || !tenant) return;
 
+    // Detrazione crediti
     const success = await deductCredits(50, `Screening CV: ${candidateName}`);
     if (!success) return;
 
     setIsAnalyzing(true);
 
     try {
-      // Calcola un voto coerente a 3 Stelle se si tratta del CV di collaudo caricato
-      const isTestCv = fileName && fileName.toLowerCase().includes('mario-rossi');
-      const randomStars = isTestCv ? 3 : Math.floor(Math.random() * 4) + 2; 
-      const scoreOn100 = randomStars * 20;
+      // 1. CARICAMENTO REALE DEL FILE PDF NEL TUO BUCKET SUPABASE STORAGE "cv"
+      const fileExt = selectedFile.name.split('.').pop();
+      const uniqueFileName = `cv-${Date.now()}.${fileExt}`;
+      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/public/cv/${uniqueFileName}`;
 
-      const mockAnalysis = {
-        strengths: [
-          `Forte corrispondenza tecnica con i requisiti dell'annuncio: ${extractedJobTitle}`,
-          `Possesso delle certificazioni chiave rilevate: ${extractedSkills.slice(0, 2).join(', ')}.`
-        ],
-        weaknesses: [
-          'Richiede un breve periodo di affiancamento iniziale sui quadri elettrici di media tensione.'
-        ],
-        certifications: extractedSkills,
-        location_proximity: 'Residente in prossimità della sede logistica aziendale.',
-        job_match_justification: isTestCv 
-          ? `Il candidato presenta una congruenza esatta di 3 su 5 stelle con l'annuncio web. Possiede la certificazione CEI 11-27 richiesta, ma ha solo 4 anni di esperienza ed ha operato quasi interamente nel civile monofase anziché industriale trifase.`
-          : `Il candidato presenta una congruenza di ${randomStars} su 5 stelle con l'annuncio web specificato. Ottima attinenza tecnica delle esperienze maturate.`
-      };
-
-      const payload = {
-        tenant_id: tenant?.id,
-        candidate_name: candidateName,
-        applied_role: extractedJobTitle,
-        cv_file_url: 'https://hmpxgbzykwwqgfzifdlc.supabase.co/storage/v1/object/public/cv/esempio.pdf',
-        score: scoreOn100,
-        ai_analysis_json: mockAnalysis,
-        status: 'da_valutare'
-      };
-
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/cv_candidates`, {
+      const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': selectedFile.type
         },
-        body: JSON.stringify(payload)
+        body: selectedFile
       });
 
-      if (res.ok) {
+      if (!uploadResponse.ok) {
+        throw new Error("Impossibile salvare il file PDF nello storage di Supabase. Verifica che il bucket 'cv' sia stato creato ed impostato come Public.");
+      }
+
+      // 2. CHIAMATA DIRETTA E REALE AL TUO WEBHOOK n8n "compare-cv" PASSA IL LINK PUBLIC DEL FILE
+      const n8nResponse = await fetch("https://n8n.rmstudio.app/webhook/compare-cv", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          candidate_name: candidateName,
+          applied_role: extractedJobTitle,
+          cv_file_url: uploadUrl
+        })
+      });
+
+      if (n8nResponse.ok) {
         setCandidateName('');
         setFileName(null);
-        await fetchCandidates();
+        setSelectedFile(null);
+        await fetchCandidates(); // Ricarica la tabella con il nuovo candidato elaborato da n8n
+      } else {
+        alert("Errore nell'elaborazione del CV da parte dell'agente n8n.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert("Errore durante lo screening: " + err.message);
     } finally {
       setIsAnalyzing(false);
     }
@@ -232,7 +230,6 @@ export default function CvEvaluator() {
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none"
               />
               
-              {/* CORRETTO: Inserito l'input di tipo file nascosto e collegato l'evento Click e Drag-and-Drop */}
               <div 
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -242,6 +239,7 @@ export default function CvEvaluator() {
                   const file = e.dataTransfer.files?.[0];
                   if (file && file.type === "application/pdf") {
                     setFileName(file.name);
+                    setSelectedFile(file);
                     if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
                   }
                 }}
@@ -255,6 +253,7 @@ export default function CvEvaluator() {
                     const file = e.target.files?.[0];
                     if (file) {
                       setFileName(file.name);
+                      setSelectedFile(file);
                       if (!candidateName) setCandidateName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '));
                     }
                   }}
@@ -268,7 +267,7 @@ export default function CvEvaluator() {
                 </span>
               </div>
 
-              <button type="submit" disabled={isAnalyzing || !candidateName || !fileName} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">
+              <button type="submit" disabled={isAnalyzing || !candidateName || !fileName || !selectedFile} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold rounded-xl transition">
                 {isAnalyzing ? "Confronto in corso..." : "✨ Confronta CV (50 crediti)"}
               </button>
             </form>
