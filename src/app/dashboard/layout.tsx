@@ -14,8 +14,6 @@ interface ChatMessage {
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
   const pathname = usePathname();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   const [chatOpen, setChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'init-1', text: "Ciao! Sono Giulia, l'assistente virtuale di Free Energy. Sono qui per aiutarti a configurare la piattaforma e ad usare i moduli al meglio.", sender: 'bot' }
@@ -79,27 +77,33 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const navItems = [
-    { name: "PV Planner (Mappa)", href: "/dashboard/pv-planner", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
-    { name: "Leads & CRM", href: "/dashboard/leads", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> },
-    { name: "Valutazione CV", href: "/dashboard/cv-evaluator", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
-    { name: "Social Creator", href: "/dashboard/social-creator", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> },
-    
-    // MODULI OPZIONALI ATTIVI
-    { name: "Nexus AI Chatbot", href: "/dashboard/nexus", active: tenant?.nexus_active, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>, addon: true },
-    { 
-      name: "Receptionist AI H24", 
-      href: "/dashboard/dentis", 
-      active: tenant?.dentis_active, 
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM9 9h6M9 13h3" />
-        </svg>
-      ), 
-      addon: true 
+  // Suddivisione strategica dei menu per aree operative e colori distintivi
+  const sidebarGroups = [
+    {
+      title: "Produzione & CRM",
+      colorClass: "text-emerald-400",
+      items: [
+        { name: "PV Planner (Mappa)", href: "/dashboard/pv-planner", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
+        { name: "Leads & CRM", href: "/dashboard/leads", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> },
+        { name: "Valutazione CV", href: "/dashboard/cv-evaluator", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+        { name: "Social Creator", href: "/dashboard/social-creator", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> }
+      ]
     },
-    
-    { name: "Impostazioni Brand", href: "/dashboard/settings", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> }
+    {
+      title: "Servizi Premium (Add-on)",
+      colorClass: "text-purple-400", // Colore premium viola ad alta visibilità
+      items: [
+        { name: "Nexus AI Chatbot", href: "/dashboard/nexus", active: tenant?.nexus_active, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>, addon: true },
+        { name: "Receptionist AI H24", href: "/dashboard/dentis", active: tenant?.dentis_active, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM9 9h6M9 13h3" /></svg>, addon: true }
+      ]
+    },
+    {
+      title: "Amministrazione",
+      colorClass: "text-zinc-500",
+      items: [
+        { name: "Impostazioni Brand", href: "/dashboard/settings", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> }
+      ]
+    }
   ];
 
   const brandColor = tenant?.brand_color_hex || '#0284c7';
@@ -113,44 +117,55 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
+    <div className="min-h-screen bg-transparent text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
       
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 p-6 space-y-8 flex-shrink-0">
+      <aside className="hidden md:flex flex-col w-64 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 space-y-6 flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm" style={{ backgroundColor: brandColor }}>
             {tenant?.company_name.substring(0, 2).toUpperCase()}
           </div>
           <span className="font-bold text-lg text-white tracking-tight">{tenant?.company_name}</span>
         </div>
-        <nav className="flex-1 space-y-2">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            const isGreyedOut = item.addon && !item.active;
 
-            return (
-              <Link 
-                key={item.href} 
-                href={item.href} 
-                className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition ${
-                  isActive 
-                    ? 'text-white bg-zinc-800' 
-                    : isGreyedOut 
-                      ? 'text-zinc-650 hover:text-zinc-400 bg-zinc-950/20' 
-                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
-                }`} 
-                style={isActive ? { borderLeft: `3px solid ${brandColor}` } : {}}
-              >
-                <div className="flex items-center space-x-3">
-                  <span style={isActive ? { color: brandColor } : {}}>{item.icon}</span>
-                  <span>{item.name}</span>
-                </div>
-                {isGreyedOut && <span className="text-xs">🔒</span>}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar">
+          {sidebarGroups.map((group, groupIdx) => (
+            <div key={groupIdx} className="space-y-2">
+              <span className={`text-[10px] font-extrabold uppercase tracking-widest ${group.colorClass} block px-2 opacity-80`}>
+                {group.title}
+              </span>
+              <div className="space-y-1">
+                {group.items.map((item: any) => {
+                  const isActive = pathname === item.href;
+                  const isGreyedOut = item.addon && !item.active;
+
+                  return (
+                    <Link 
+                      key={item.href} 
+                      href={item.href} 
+                      className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+                        isActive 
+                          ? 'text-white bg-zinc-850/60' 
+                          : isGreyedOut 
+                            ? 'text-zinc-650 hover:text-zinc-500 bg-zinc-950/20' 
+                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850/30'
+                      }`} 
+                      style={isActive ? { borderLeft: `3px solid ${brandColor}` } : {}}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span style={isActive ? { color: brandColor } : {}}>{item.icon}</span>
+                        <span>{item.name}</span>
+                      </div>
+                      {isGreyedOut && <span className="text-xs">🔒</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
-        <div className="bg-zinc-850 border border-zinc-800 p-4 rounded-2xl">
+
+        <div className="bg-zinc-850/60 border border-zinc-800 p-4 rounded-2xl">
           <span className="text-xs font-semibold text-zinc-400 uppercase block">Crediti Attivi</span>
           <span className="text-2xl font-black text-white mt-1 block">{tenant?.credits.toLocaleString()}</span>
         </div>
@@ -161,7 +176,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Chatbot Galleggiante - CORRETTO: Inserito print:hidden per escluderlo dai PDF */}
+      {/* Chatbot Galleggiante */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
         {chatOpen && (
           <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
@@ -196,7 +211,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         )}
 
         <button onClick={() => setChatOpen(!chatOpen)} className="w-14 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-full shadow-lg flex items-center justify-center transition duration-200">
-          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
+          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
         </button>
       </div>
 
