@@ -50,23 +50,22 @@ export default function MapPlanner({
     `;
     document.head.appendChild(styleEl);
 
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => {
+    // Inizializzazione sicura con rimozione istanze precedenti
+    const L = (window as any).L;
+    if (L) {
       initializeMap();
-    };
-    document.body.appendChild(script);
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = () => {
+        initializeMap();
+      };
+      document.body.appendChild(script);
+    }
 
     return () => {
       styleEl.remove();
-      link.remove();
-      script.remove();
     };
   }, []);
 
@@ -113,7 +112,7 @@ export default function MapPlanner({
     const L = (window as any).L;
     if (!L) return;
 
-    // Prevenzione e distruzione istanza esistente per scongiurare l'errore "Map container is already initialized"
+    // Distruzione preventiva per scongiurare l'errore "Map container is already initialized"
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
