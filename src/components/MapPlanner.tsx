@@ -14,7 +14,7 @@ interface MapPlannerProps {
   panelRotation: number;
   currentPoints: Coordinate[];
   savedRoofs: any[];
-  mapCenter: Coordinate | null; // Aggiunto per riposizionamento reattivo
+  mapCenter: Coordinate | null;
   onMapClick: (point: Coordinate) => void;
   onPanelDeleted: (roofId: string) => void;
 }
@@ -72,13 +72,7 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Riposiziona reattivamente la telecamera satellitare quando cambia l'indirizzo cercato
-  useEffect(() => {
-    if (mapRef.current && mapReady && mapCenter) {
-      mapRef.current.setView([mapCenter.lat, mapCenter.lng], 19);
-    }
-  }, [mapCenter, mapReady]);
-
+  // Ridisegna reattivamente tetti, pannelli e quotature metriche
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -92,10 +86,15 @@ export default function MapPlanner({
         fillOpacity: 0.25
       }).addTo(savedRoofsLayerGroupRef.current);
 
+      // Disegna i moduli fotovoltaici all'interno
       drawPanelsForRoof(roof.points, roof.id);
+
+      // Disegna le quotature metriche (i fumetti con i metri) sui bordi delle aree salvate
+      drawSegmentLengths(roof.points, savedRoofsLayerGroupRef.current);
     });
   }, [panelRotation, savedRoofs, mapReady]);
 
+  // Gestione dinamica dei segnaposto e del poligono in fase di disegno corrente
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -116,7 +115,18 @@ export default function MapPlanner({
         fillOpacity: 0.25
       }).addTo(mapRef.current);
     }
+
+    // Se stiamo disegnando, mostra le quotature metriche delle linee in tempo reale
+    if (currentPoints.length >= 2) {
+      drawSegmentLengths(currentPoints, mapRef.current, true);
+    }
   }, [currentPoints, mapReady]);
+
+  useEffect(() => {
+    if (mapRef.current && mapReady && mapCenter) {
+      mapRef.current.setView([mapCenter.lat, mapCenter.lng], 19);
+    }
+  }, [mapCenter, mapReady]);
 
   const initializeMap = () => {
     const L = (window as any).L;
@@ -148,6 +158,51 @@ export default function MapPlanner({
     map.on('click', (e: any) => {
       onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
     });
+  };
+
+  // Funzione per calcolare la distanza e disegnare i badge metrici nei punti medi dei segmenti
+  const drawSegmentLengths = (points: Coordinate[], targetLayer: any, isTemporary = false) => {
+    const L = (window as any).L;
+    if (!L || points.length < 2) return;
+
+    // Raccoglie i marker temporanei delle quotature per poterli pulire al volo se l'area è in fase di disegno
+    if (isTemporary && (window as any).tempLengthMarkers) {
+      (window as any).tempLengthMarkers.forEach((m: any) => m.remove());
+    }
+    const tempMarkers: any[] = [];
+
+    for (let i = 0; i < points.length; i++) {
+      const p1 = points[i];
+      // Se l'area è chiusa, connetti l'ultimo punto al primo, altrimenti fermati all'ultimo punto inserito
+      const p2 = points[(i + 1) % points.length];
+      if (!isTemporary && i === points.length - 1 && points.length < 3) continue;
+      if (isTemporary && i === points.length - 1) continue;
+
+      const latlng1 = L.latLng(p1.lat, p1.lng);
+      const latlng2 = L.latLng(p2.lat, p2.lng);
+      const distanceMeters = latlng1.distanceTo(latlng2); // Calcolo metrico certificato ed esente da distorsione
+
+      // Trova la mezzeria geometrica della linea del tetto per posizionare il badge
+      const midLat = (p1.lat + p2.lat) / 2;
+      const midLng = (p1.lng + p2.lng) / 2;
+
+      // Crea un marker testuale smeraldo in glassmorphism
+      const lengthMarker = L.marker([midLat, midLng], {
+        icon: L.divIcon({
+          className: 'bg-zinc-950/90 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-lg shadow-2xl pointer-events-none whitespace-nowrap',
+          html: `${distanceMeters.toFixed(1)} m`,
+          iconAnchor: [20, 8]
+        })
+      }).addTo(targetLayer);
+
+      if (isTemporary) {
+        tempMarkers.push(lengthMarker);
+      }
+    }
+
+    if (isTemporary) {
+      (window as any).tempLengthMarkers = tempMarkers;
+    }
   };
 
   const drawPanelsForRoof = (points: Coordinate[], roofId: string) => {
