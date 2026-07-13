@@ -1,0 +1,12 @@
+Curriculum Vitae di Mario Rossi
+Contatto: mariorossi@email.it | 340-1234567
+
+Esperienze Lavorative:
+- Elettricista Civile generico presso Ditta Luce (2022 - 2026): cablaggio impianti domestici, installazione punti luce e piccoli impianti monofase.
+- Aiuto Elettricista (2020 - 2022): montaggio canaline e tiraggio cavi.
+
+Competenze e Certificazioni:
+- Certificato PES/PAV (CEI 11-27) conseguito nel 2024.
+- Patente B.
+
+Nota AI per la compatibilità: Il candidato ha la certificazione CEI 11-27 richiesta, ma ha solo 4 anni di esperienza (invece di 5) e l'ha maturata quasi interamente nel settore civile monofase anziché industriale trifase. Inoltre, non possiede l'abilitazione all'uso di piattaforme aeree (PLE). La congruenza finale calcolata è di 3 stelle (60%).
