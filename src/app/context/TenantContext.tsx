@@ -25,6 +25,7 @@ interface TenantContextType {
   refreshTenant: () => Promise<void>;
   deductCredits: (amount: number, description: string) => Promise<boolean>;
   activateService: (serviceName: 'nexus' | 'dentis', cost: number) => Promise<boolean>;
+  updateTenantState: (updated: Partial<Tenant>) => void; // Aggiunto per allineamento istantaneo
   setTenantId: (id: string) => void;
 }
 
@@ -41,7 +42,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       if (id === 'modena.riccardo@gmail.com') {
-        setTenant({
+        const adminData = {
           id: 'admin-riccardo',
           company_name: 'Nova Solar (Admin)',
           logo_url: null,
@@ -52,7 +53,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           panel_height_m: 1.0,
           nexus_active: true,
           dentis_active: true
-        });
+        };
+        setTenant(adminData);
+        localStorage.setItem('fe_tenant_data', JSON.stringify(adminData));
         return;
       }
 
@@ -69,30 +72,40 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
       if (data && data.length > 0) {
-        setTenant({
+        const fullData = {
           ...data[0],
           panel_width_m: data[0].panel_width_m || 1.65,
           panel_height_m: data[0].panel_height_m || 1.0,
           nexus_active: data[0].nexus_active || false,
           dentis_active: data[0].dentis_active || false
-        });
+        };
+        setTenant(fullData);
+        localStorage.setItem('fe_tenant_data', JSON.stringify(fullData));
       } else {
         await createDemoTenantIfNotExist(id);
       }
     } catch (err: any) {
-      console.warn("Profilo dimostrativo attivo:", err.message);
-      setTenant({
-        id: id,
-        company_name: id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL',
-        logo_url: null,
-        brand_color_hex: '#0284c7',
-        notification_email: id === 'sipro-energy' ? 'info@siproenergy.it' : 'info@solisenergy.it',
-        credits: id === 'sipro-energy' ? 10000 : 500,
-        panel_width_m: 1.65,
-        panel_height_m: 1.0,
-        nexus_active: false,
-        dentis_active: false
-      });
+      console.warn("Utilizzo cache locale o demo per sbloccare la Dashboard:", err.message);
+      // Se Supabase risponde con un 401, leggiamo l'ultimo valore valido salvato localmente
+      const localCached = localStorage.getItem('fe_tenant_data');
+      if (localCached) {
+        try {
+          setTenant(JSON.parse(localCached));
+        } catch (_) {}
+      } else {
+        setTenant({
+          id: id,
+          company_name: id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL',
+          logo_url: null,
+          brand_color_hex: '#0284c7',
+          notification_email: id === 'sipro-energy' ? 'info@siproenergy.it' : 'info@solisenergy.it',
+          credits: id === 'sipro-energy' ? 10000 : 500,
+          panel_width_m: 1.65,
+          panel_height_m: 1.0,
+          nexus_active: false,
+          dentis_active: false
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -126,13 +139,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const created = await res.json();
         if (created && created.length > 0) {
-          setTenant({
+          const fullData = {
             ...created[0],
             panel_width_m: created[0].panel_width_m || 1.65,
             panel_height_m: created[0].panel_height_m || 1.0,
             nexus_active: created[0].nexus_active || false,
             dentis_active: created[0].dentis_active || false
-          });
+          };
+          setTenant(fullData);
+          localStorage.setItem('fe_tenant_data', JSON.stringify(fullData));
         }
       }
     } catch (e) {
@@ -143,11 +158,28 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const savedId = localStorage.getItem('fe_tenant_id') || 'sipro-energy';
     setTenantIdState(savedId);
+
+    // Carica immediatamente i dati locali all'avvio (Zero ritardi visivi)
+    const localCached = localStorage.getItem('fe_tenant_data');
+    if (localCached) {
+      try {
+        setTenant(JSON.parse(localCached));
+      } catch (_) {}
+    }
     fetchTenantData(savedId);
   }, []);
 
   const refreshTenant = async () => {
     await fetchTenantData(tenantId);
+  };
+
+  const updateTenantState = (updated: Partial<Tenant>) => {
+    setTenant(prev => {
+      if (!prev) return null;
+      const next = { ...prev, ...updated };
+      localStorage.setItem('fe_tenant_data', JSON.stringify(next));
+      return next;
+    });
   };
 
   const setTenantId = (id: string) => {
@@ -168,7 +200,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    setTenant(prev => prev ? { ...prev, credits: prev.credits - amount } : null);
+    const nextCredits = tenant.credits - amount;
+    updateTenantState({ credits: nextCredits });
 
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/credit_transactions`, {
@@ -196,10 +229,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     const success = await deductCredits(cost, `Attivazione modulo: ${serviceName.toUpperCase()}`);
     if (!success) return false;
 
-    try {
-      const payload: any = {};
-      payload[`${serviceName}_active`] = true;
+    const update: any = {};
+    update[`${serviceName}_active`] = true;
+    updateTenantState(update);
 
+    try {
       await fetch(`${SUPABASE_URL}/rest/v1/tenants?id=eq.${tenant.id}`, {
         method: 'PATCH',
         headers: {
@@ -207,24 +241,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(update)
       });
-
-      setTenant(prev => prev ? { ...prev, ...payload } : null);
       return true;
     } catch (err) {
-      setTenant(prev => {
-        if (!prev) return null;
-        const fallback: any = { ...prev };
-        fallback[`${serviceName}_active`] = true;
-        return fallback;
-      });
       return true;
     }
   };
 
   return (
-    <TenantContext.Provider value={{ tenant, loading, error, refreshTenant, deductCredits, activateService, setTenantId }}>
+    <TenantContext.Provider value={{ tenant, loading, error, refreshTenant, deductCredits, activateService, updateTenantState, setTenantId }}>
       {children}
     </TenantContext.Provider>
   );
