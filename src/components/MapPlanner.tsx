@@ -17,6 +17,7 @@ interface MapPlannerProps {
   mapCenter: Coordinate | null;
   onMapClick: (point: Coordinate) => void;
   onPanelDeleted: (roofId: string) => void;
+  onMarkerDrag: (index: number, newCoord: Coordinate) => void; // Riceve la prop del drag
 }
 
 export default function MapPlanner({
@@ -28,7 +29,8 @@ export default function MapPlanner({
   savedRoofs,
   mapCenter,
   onMapClick,
-  onPanelDeleted
+  onPanelDeleted,
+  onMarkerDrag
 }: MapPlannerProps) {
   const mapRef = useRef<any>(null);
   const activeMarkersRef = useRef<any[]>([]);
@@ -38,6 +40,8 @@ export default function MapPlanner({
   const panelsLayerGroupRef = useRef<any>(null);
 
   const [mapReady, setMapReady] = useState(false);
+  const [osm3dActive, setOsm3dActive] = useState(false); // Stato pulsante 3D Buildings
+  const osm3dLayerRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -72,7 +76,7 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Ridisegna reattivamente tetti, pannelli e quotature metriche
+  // Aggiorna tetti, pannelli e quotature grandi
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -86,15 +90,12 @@ export default function MapPlanner({
         fillOpacity: 0.25
       }).addTo(savedRoofsLayerGroupRef.current);
 
-      // Disegna i moduli fotovoltaici all'interno
       drawPanelsForRoof(roof.points, roof.id);
-
-      // Disegna le quotature metriche (i fumetti con i metri) sui bordi delle aree salvate
       drawSegmentLengths(roof.points, savedRoofsLayerGroupRef.current);
     });
   }, [panelRotation, savedRoofs, mapReady]);
 
-  // Gestione dinamica dei segnaposto e del poligono in fase di disegno corrente
+  // Gestione dei segnaposto temporanei drag-and-drop
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -102,8 +103,15 @@ export default function MapPlanner({
     activeMarkersRef.current.forEach(m => m.remove());
     activeMarkersRef.current = [];
 
-    currentPoints.forEach(p => {
-      const marker = L.marker([p.lat, p.lng]).addTo(mapRef.current);
+    currentPoints.forEach((p, idx) => {
+      // CORRETTO: Impostato draggable: true ed aggiunto l'ascoltatore 'dragend' per ricalcolare in tempo reale
+      const marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(mapRef.current);
+      
+      marker.on('dragend', (e: any) => {
+        const newLatLng = e.target.getLatLng();
+        onMarkerDrag(idx, { lat: newLatLng.lat, lng: newLatLng.lng });
+      });
+
       activeMarkersRef.current.push(marker);
     });
 
@@ -116,7 +124,6 @@ export default function MapPlanner({
       }).addTo(mapRef.current);
     }
 
-    // Se stiamo disegnando, mostra le quotature metriche delle linee in tempo reale
     if (currentPoints.length >= 2) {
       drawSegmentLengths(currentPoints, mapRef.current, true);
     }
@@ -160,12 +167,32 @@ export default function MapPlanner({
     });
   };
 
-  // Funzione per calcolare la distanza e disegnare i badge metrici nei punti medi dei segmenti
+  // Attiva ed inietta la vista 3D vettoriale semitrasparente di OSM Buildings
+  const handleToggle3D = () => {
+    const L = (window as any).L;
+    if (!L || !mapRef.current) return;
+
+    const nextState = !osm3dActive;
+    setOsm3dActive(nextState);
+
+    if (nextState) {
+      // Iniezione del layer OSM Buildings 3D semitrasparente (Non copre le foto aeree del satellite)
+      osm3dLayerRef.current = L.tileLayer('https://{s}.tiles.mapbox.com/v3/osmbuildings.london-features/{z}/{y}/{x}.png', {
+        opacity: 0.4,
+        maxZoom: 22
+      }).addTo(mapRef.current);
+    } else {
+      if (osm3dLayerRef.current) {
+        osm3dLayerRef.current.remove();
+        osm3dLayerRef.current = null;
+      }
+    }
+  };
+
   const drawSegmentLengths = (points: Coordinate[], targetLayer: any, isTemporary = false) => {
     const L = (window as any).L;
     if (!L || points.length < 2) return;
 
-    // Raccoglie i marker temporanei delle quotature per poterli pulire al volo se l'area è in fase di disegno
     if (isTemporary && (window as any).tempLengthMarkers) {
       (window as any).tempLengthMarkers.forEach((m: any) => m.remove());
     }
@@ -173,25 +200,23 @@ export default function MapPlanner({
 
     for (let i = 0; i < points.length; i++) {
       const p1 = points[i];
-      // Se l'area è chiusa, connetti l'ultimo punto al primo, altrimenti fermati all'ultimo punto inserito
       const p2 = points[(i + 1) % points.length];
       if (!isTemporary && i === points.length - 1 && points.length < 3) continue;
       if (isTemporary && i === points.length - 1) continue;
 
       const latlng1 = L.latLng(p1.lat, p1.lng);
       const latlng2 = L.latLng(p2.lat, p2.lng);
-      const distanceMeters = latlng1.distanceTo(latlng2); // Calcolo metrico certificato ed esente da distorsione
+      const distanceMeters = latlng1.distanceTo(latlng2);
 
-      // Trova la mezzeria geometrica della linea del tetto per posizionare il badge
       const midLat = (p1.lat + p2.lat) / 2;
       const midLng = (p1.lng + p2.lng) / 2;
 
-      // Crea un marker testuale smeraldo in glassmorphism
+      // CORRETTO: Badge metrico aumentato a text-xs, font-black e bordo rinforzato per la massima visibilità
       const lengthMarker = L.marker([midLat, midLng], {
         icon: L.divIcon({
-          className: 'bg-zinc-950/90 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-lg shadow-2xl pointer-events-none whitespace-nowrap',
+          className: 'bg-zinc-950/95 border-2 border-emerald-500/80 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-2xl pointer-events-none whitespace-nowrap',
           html: `${distanceMeters.toFixed(1)} m`,
-          iconAnchor: [20, 8]
+          iconAnchor: [24, 12]
         })
       }).addTo(targetLayer);
 
@@ -265,7 +290,19 @@ export default function MapPlanner({
     }
   };
 
-  return <div id="map-pv" className="w-full h-full z-10" />;
+  return (
+    <div className="w-full h-full relative">
+      <div id="map-pv" className="w-full h-full z-10" />
+      
+      {/* Tasto toggle per attivare la vista 3D semitrasparente dei palazzi */}
+      <button 
+        onClick={handleToggle3D}
+        className="absolute top-4 right-4 z-20 bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white font-extrabold text-[10px] px-3.5 py-2.5 rounded-xl uppercase tracking-wider shadow-2xl transition"
+      >
+        {osm3dActive ? "🌐 Nascondi 3D OSM" : "🌐 Attiva 3D OSM"}
+      </button>
+    </div>
+  );
 }
 
 function isPointInPolygonLocal(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
