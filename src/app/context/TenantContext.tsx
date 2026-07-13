@@ -2,15 +2,23 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// Funzione di inizializzazione ultra-sicura per prevenire stringhe "undefined" o vuote
+/**
+ * Funzione di utilità per acquisire e sanificare in modo sicuro le variabili d'ambiente.
+ * Rimuove eventuali virgolette singole/doppie, spazi o slash finali che causerebbero
+ * errori di autorizzazione 401 o 400 Bad Request su Supabase.
+ */
 const getEnvVar = (value: string | undefined, fallback: string): string => {
-  if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
+  if (!value || value === "undefined" || value.trim() === "" || value === "null") {
+    return fallback;
+  }
   return value.replace(/^["']|["']$/g, '').trim();
 };
 
+// Inizializzazione pulita degli URL e delle Chiavi API
 const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
 const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
 
+// Interfaccia del Tenant
 export interface Tenant {
   id: string;
   company_name: string;
@@ -24,6 +32,7 @@ export interface Tenant {
   dentis_active: boolean; 
 }
 
+// Tipo per il contesto del Tenant
 interface TenantContextType {
   tenant: Tenant | null;
   loading: boolean;
@@ -43,12 +52,22 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Recupera i dati del Tenant dal database Supabase.
+   * Se il database risponde con errore o non è raggiungibile, carica la versione cache locale o di backup.
+   */
   const fetchTenantData = async (id: string) => {
     setLoading(true);
     setError(null);
+    
+    // Log diagnostico in console per facilitare il debugging delle chiavi
+    console.log(`[TenantContext] Inizializzazione caricamento per il tenant: "${id}"`);
+    console.log(`[TenantContext] Configurazione Supabase URL: "${SUPABASE_URL}"`);
+
     try {
+      // Gestione utente Admin Riccardo
       if (id === 'modena.riccardo@gmail.com') {
-        const adminData = {
+        const adminData: Tenant = {
           id: 'admin-riccardo',
           company_name: 'Nova Solar (Admin)',
           logo_url: null,
@@ -65,6 +84,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Query REST a Supabase
       const response = await fetch(`${SUPABASE_URL}/rest/v1/tenants?id=eq.${id}&select=*`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -72,29 +92,48 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      if (!response.ok) throw new Error('Accesso non autorizzato (401/403)');
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.error(`[TenantContext] Risposta di rete non valida da Supabase: ${response.status} - ${errBody}`);
+        throw new Error(`Errore di connessione Supabase: ${response.status}`);
+      }
 
       const data = await response.json();
+      
       if (data && data.length > 0) {
-        const fullData = {
+        // Unione dati con valori predefiniti di sicurezza
+        const fullData: Tenant = {
           ...data[0],
           panel_width_m: data[0].panel_width_m || 1.65,
           panel_height_m: data[0].panel_height_m || 1.0,
           nexus_active: data[0].nexus_active || false,
           dentis_active: data[0].dentis_active || false
         };
+        
+        console.log(`[TenantContext] Dati del tenant caricati correttamente in cloud:`, fullData);
         setTenant(fullData);
         localStorage.setItem('fe_tenant_data', JSON.stringify(fullData));
       } else {
+        // Se l'ID cercato non esiste, avvia la creazione automatica del tenant demo
+        console.log(`[TenantContext] Tenant "${id}" non trovato nel database. Creazione demo in corso...`);
         await createDemoTenantIfNotExist(id);
       }
     } catch (err: any) {
-      console.warn("Utilizzo cache locale:", err.message);
+      console.warn(`[TenantContext] Connessione cloud fallita. Utilizzo cache locale:`, err.message);
+      
+      // Caricamento paracadute da localStorage
       const localCached = localStorage.getItem('fe_tenant_data');
       if (localCached && localCached !== "undefined" && localCached !== "null") {
-        try { setTenant(JSON.parse(localCached)); } catch (_) {}
+        try { 
+          const parsed = JSON.parse(localCached);
+          setTenant(parsed); 
+          console.log(`[TenantContext] Cache locale caricata con successo:`, parsed);
+        } catch (_) {
+          console.error(`[TenantContext] Errore di parsing della cache locale.`);
+        }
       } else {
-        setTenant({
+        // Creazione tenant mockup di backup se la cache locale è vuota
+        const backupTenant: Tenant = {
           id: id,
           company_name: id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL',
           logo_url: null,
@@ -105,13 +144,19 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           panel_height_m: 1.0,
           nexus_active: false,
           dentis_active: false
-        });
+        };
+        console.log(`[TenantContext] Nessuna cache locale trovata. Caricamento backup offline:`, backupTenant);
+        setTenant(backupTenant);
       }
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Crea un Tenant demo di backup direttamente nel database di Supabase
+   * qualora non fosse presente (evita l'errore 404 all'onboarding).
+   */
   const createDemoTenantIfNotExist = async (id: string) => {
     const initialCredits = id === 'sipro-energy' ? 10000 : 500;
     const companyName = id === 'sipro-energy' ? 'Sipro Energy' : 'Solis Energy SRL';
@@ -134,36 +179,47 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
+          'Prefer': 'return=representation' // Forza Supabase a restituire il record inserito
         },
         body: JSON.stringify(demoPayload)
       });
+      
       if (res.ok) {
         const created = await res.json();
         if (created && created.length > 0) {
-          const fullData = {
+          const fullData: Tenant = {
             ...created[0],
             panel_width_m: created[0].panel_width_m || 1.65,
             panel_height_m: created[0].panel_height_m || 1.0,
             nexus_active: created[0].nexus_active || false,
             dentis_active: created[0].dentis_active || false
           };
+          console.log(`[TenantContext] Tenant demo creato ed inizializzato:`, fullData);
           setTenant(fullData);
           localStorage.setItem('fe_tenant_data', JSON.stringify(fullData));
         }
+      } else {
+        const errText = await res.text();
+        console.error(`[TenantContext] Errore creazione tenant demo: ${res.status} - ${errText}`);
       }
     } catch (e) {
-      console.error("Errore durante la creazione del tenant demo:", e);
+      console.error("[TenantContext] Eccezione riscontrata nella creazione del tenant demo:", e);
     }
   };
 
+  /**
+   * All'avvio dell'applicazione, recupera le impostazioni salvate
+   * ed avvia l'interrogazione cloud del database.
+   */
   useEffect(() => {
     const savedId = localStorage.getItem('fe_tenant_id') || 'sipro-energy';
     setTenantIdState(savedId);
 
     const localCached = localStorage.getItem('fe_tenant_data');
     if (localCached && localCached !== "undefined" && localCached !== "null") {
-      try { setTenant(JSON.parse(localCached)); } catch (_) {}
+      try { 
+        setTenant(JSON.parse(localCached)); 
+      } catch (_) {}
     }
     fetchTenantData(savedId);
   }, []);
@@ -187,19 +243,27 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     fetchTenantData(id);
   };
 
+  /**
+   * Sottrae un ammontare di crediti e scrive la transazione sul database log di Supabase.
+   */
   const deductCredits = async (amount: number, description: string): Promise<boolean> => {
     if (!tenant) return false;
+    
+    // Gestione crediti illimitati per gli amministratori
     if (tenant.credits > 500000) return true;
+    
     if (tenant.credits < amount) {
-      alert("Crediti insufficienti.");
+      alert("Crediti insufficienti nel wallet.");
       return false;
     }
 
     const nextCredits = tenant.credits - amount;
     updateTenantState({ credits: nextCredits });
 
+    console.log(`[TenantContext] Detrazione crediti: -${amount} per "${description}". Nuovi crediti stimati: ${nextCredits}`);
+
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/credit_transactions`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/credit_transactions`, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -212,14 +276,24 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           description: description
         })
       });
+      
+      if (!response.ok) {
+        console.warn(`[TenantContext] Scrittura transazione rifiutata da Supabase. Stato: ${response.status}`);
+      }
       return true;
     } catch (err) {
+      console.warn("[TenantContext] Impossibile scrivere la transazione su Supabase. Crediti modificati localmente.");
       return true;
     }
   };
 
+  /**
+   * Attiva un servizio Premium (Nexus AI o Serena AI / Dentis)
+   * detraendone il costo mensile dal wallet crediti.
+   */
   const activateService = async (serviceName: 'nexus' | 'dentis', cost: number): Promise<boolean> => {
     if (!tenant) return false;
+    
     const success = await deductCredits(cost, `Attivazione modulo: ${serviceName.toUpperCase()}`);
     if (!success) return false;
 
@@ -239,19 +313,34 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       });
       return true;
     } catch (err) {
+      console.warn("[TenantContext] Impossibile persistere lo stato di attivazione in cloud.");
       return true;
     }
   };
 
   return (
-    <TenantContext.Provider value={{ tenant, loading, error, refreshTenant, deductCredits, activateService, updateTenantState, setTenantId }}>
+    <TenantContext.Provider value={{ 
+      tenant, 
+      loading, 
+      error, 
+      refreshTenant, 
+      deductCredits, 
+      activateService, 
+      updateTenantState, 
+      setTenantId 
+    }}>
       {children}
     </TenantContext.Provider>
   );
 }
 
+/**
+ * Hook personalizzato per usufruire del Context del Tenant all'interno del frontend.
+ */
 export function useTenant() {
   const context = useContext(TenantContext);
-  if (!context) throw new Error('useTenant deve essere usato in un TenantProvider');
+  if (!context) {
+    throw new Error('useTenant deve essere usato all\'interno di un TenantProvider');
+  }
   return context;
 }
