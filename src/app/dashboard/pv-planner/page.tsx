@@ -74,6 +74,11 @@ export default function PvPlanner() {
     setCurrentPoints(prev => [...prev, point]);
   };
 
+  // CORRETTO: Inserita la funzione di annullamento punto temporaneo
+  const handleUndoLastPoint = () => {
+    setCurrentPoints(prev => prev.slice(0, -1));
+  };
+
   const handleSaveCurrentRoof = () => {
     if (currentPoints.length < 3) {
       alert("Definisci almeno 3 segnaposto sulla mappa prima di salvare.");
@@ -90,6 +95,16 @@ export default function PvPlanner() {
 
   const handlePanelDeleted = (roofId: string) => {
     setSavedRoofs(prev => prev.map(r => r.id === roofId ? { ...r, panelCount: Math.max(0, r.panelCount - 1) } : r));
+  };
+
+  // CORRETTO: Inserita la funzione di cancellazione dell'area salvata
+  const handleDeleteRoof = (id: string) => {
+    setSavedRoofs(prev => prev.filter(r => r.id !== id));
+  };
+
+  // CORRETTO: Inserita la funzione di rinomina dell'area salvata
+  const handleRenameRoof = (id: string, newName: string) => {
+    setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -154,9 +169,11 @@ export default function PvPlanner() {
     setIsCalculated(false);
   };
 
+  const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
+
   return (
     <div className="space-y-8">
-      {/* Intestazione PDF unificata */}
+      {/* Intestazione di Stampa */}
       <div className="hidden print:flex print:items-start print:justify-between print:border-b print:border-zinc-300 print:pb-6 print:mb-6">
         <div className="space-y-1">
           <h2 className="text-2xl font-black text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
@@ -191,7 +208,7 @@ export default function PvPlanner() {
           onResetPlanner={handleResetPlanner}
         />
 
-        <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden relative print:block print:h-[350px] print:w-full print:mb-8 print:border print:border-zinc-300 print:rounded-2xl">
+        <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative print:block print:h-[350px] print:w-full print:mb-8 print:border print:border-zinc-300 print:rounded-2xl">
           <MapPlanner 
             brandColor={brandColor}
             panelWidth={tenant?.panel_width_m || 1.65}
@@ -224,6 +241,7 @@ export default function PvPlanner() {
   );
 }
 
+// Spostati all'esterno del componente per risolvere l'hoisting
 function calculateAreaInSqm(points: Coordinate[]) {
   if (points.length < 3) return 0;
   const latMid = points[0].lat * Math.PI / 180;
