@@ -46,6 +46,7 @@ export default function PvPlanner() {
   const [estimatedCost, setEstimatedCost] = useState(0);
   const [monthlyBill, setMonthlyBill] = useState('600');
 
+  // Ricalcola istantaneamente i pannelli di tutte le aree ad ogni scatto dello slider
   useEffect(() => {
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
@@ -59,6 +60,7 @@ export default function PvPlanner() {
     }));
   }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
 
+  // Scorrimento fluido verso il basso alla comparsa del preventivo
   useEffect(() => {
     if (isCalculated) {
       setTimeout(() => {
@@ -70,6 +72,7 @@ export default function PvPlanner() {
     }
   }, [isCalculated]);
 
+  // CORRETTO: Dichiarato esattamente una volta sola
   const handleMapClick = (point: Coordinate) => {
     if (isCalculated) return;
     setCurrentPoints(prev => [...prev, point]);
@@ -205,14 +208,9 @@ export default function PvPlanner() {
     }
   };
 
-  const handleMapClick = (point: Coordinate) => {
-    if (isCalculated) return;
-    setCurrentPoints(prev => [...prev, point]);
-  };
-
   return (
     <div className="space-y-8">
-      {/* Intestazione Commerciale visibile solo nel PDF stampato in prima pagina */}
+      {/* Intestazione di Stampa */}
       <div className="hidden print:flex print:items-start print:justify-between print:border-b print:border-zinc-300 print:pb-6 print:mb-6">
         <div className="space-y-1">
           <h2 className="text-2xl font-black text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
@@ -244,14 +242,14 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Slider di rotazione */}
+          {/* Slider di rotazione manuale */}
           <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white">Rotazione Pannelli</span>
+              <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
               <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
             </div>
             <input type="range" min="0" max="360" value={panelRotation} onChange={(e) => setPanelRotation(parseInt(e.target.value))} className="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-            <span className="text-[10px] text-zinc-500 block">Allinea perfettamente i pannelli alla grondaia.</span>
+            <span className="text-[10px] text-zinc-500 block">Trascina per allineare perfettamente i pannelli alla grondaia.</span>
           </div>
 
           {currentPoints.length > 0 && (
@@ -282,6 +280,7 @@ export default function PvPlanner() {
             </div>
           )}
 
+          {/* Parametri Economici */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Preventivo costi impianto</span>
             <div className="space-y-3">
@@ -332,7 +331,7 @@ export default function PvPlanner() {
           </div>
         </div>
 
-        {/* Contenitore Mappa: Mantenuto visibile in stampa con dimensioni ottimizzate */}
+        {/* Contenitore Mappa */}
         <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative print:block print:h-[350px] print:w-full print:mb-8 print:border print:border-zinc-300 print:rounded-2xl">
           <MapPlanner 
             brandColor={brandColor}
