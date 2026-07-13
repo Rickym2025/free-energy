@@ -32,7 +32,6 @@ export default function MapPlanner({
   const activeMarkersRef = useRef<any[]>([]);
   const activePolygonRef = useRef<any>(null);
   
-  // LayerGroup per contenere ed eliminare dinamicamente tetti e pannelli
   const savedRoofsLayerGroupRef = useRef<any>(null);
   const panelsLayerGroupRef = useRef<any>(null);
 
@@ -71,7 +70,6 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Aggiorna reattivamente sia i tetti che i pannelli ogni volta che cambia lo stato o lo slider
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current) return;
@@ -80,18 +78,15 @@ export default function MapPlanner({
     if (panelsLayerGroupRef.current) panelsLayerGroupRef.current.clearLayers();
 
     savedRoofs.forEach(roof => {
-      // 1. Ridisegna il poligono di sfondo del tetto
       L.polygon(roof.points.map((p: Coordinate) => [p.lat, p.lng]), {
         color: '#10b981',
         fillOpacity: 0.25
       }).addTo(savedRoofsLayerGroupRef.current);
 
-      // 2. Ridisegna i pannelli orientati all'interno
       drawPanelsForRoof(roof.points, roof.id);
     });
   }, [panelRotation, savedRoofs]);
 
-  // Aggiorna il poligono temporaneo in fase di disegno
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current) return;
@@ -117,6 +112,16 @@ export default function MapPlanner({
   const initializeMap = () => {
     const L = (window as any).L;
     if (!L) return;
+
+    // Prevenzione e distruzione istanza esistente per scongiurare l'errore "Map container is already initialized"
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+    const container = L.DomUtil.get('map-pv');
+    if (container) {
+      container._leaflet_id = null;
+    }
 
     const map = L.map('map-pv', { maxZoom: 22 }).setView([41.9028, 12.4964], 6);
     mapRef.current = map;
