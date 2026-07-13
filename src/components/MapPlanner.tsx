@@ -58,7 +58,6 @@ export default function MapPlanner({
     `;
     document.head.appendChild(styleEl);
 
-    // Carica Leaflet CSS e JS
     const L = (window as any).L;
     if (L) {
       loadOsmBuildingsScript();
@@ -77,14 +76,12 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Caricamento asincrono e integrato di OSM Buildings Classic
   const loadOsmBuildingsScript = () => {
     const OSMBuildings = (window as any).OSMBuildings;
     if (OSMBuildings) {
       initializeMap();
     } else {
       const script3d = document.createElement('script');
-      // Carica la libreria ufficiale ed unificata di OSM Buildings per Leaflet
       script3d.src = 'https://cdn.osmbuildings.org/classic/0.2.2b/OSMBuildings-Leaflet.js';
       script3d.async = true;
       script3d.onload = () => {
@@ -187,21 +184,26 @@ export default function MapPlanner({
     });
   };
 
-  // Attiva l'estrusione 3D vettoriale semitrasparente dei capannoni direttamente sopra il satellite
   const handleToggle3D = () => {
+    const L = (window as any).L;
     const OSMBuildings = (window as any).OSMBuildings;
-    if (!OSMBuildings || !mapRef.current) return;
+    if (!L || !OSMBuildings || !mapRef.current) return;
 
     const nextState = !osm3dActive;
     setOsm3dActive(nextState);
 
     if (nextState) {
-      // Inizializza il motore 3D e carica l'estrusione dei palazzi in trasparenza
-      osm3dLayerInstanceRef.current = new OSMBuildings(mapRef.current).load('https://{s}.data.osmbuildings.org/0.2/59fcc2e8/tile/{z}/{x}/{y}.json');
+      // 1. Carica lo strato tridimensionale ed estruggi i volumi in trasparenza a 35 gradi
+      osm3dLayerInstanceRef.current = new OSMBuildings(mapRef.current).load('https://a.data.osmbuildings.org/0.2/59fcc2e8/tile/{z}/{x}/{y}.json');
+      
+      // CORRETTO: Applica il tilt angolare di 35 gradi per dare l'effettiva prospettiva volumetrica tridimensionale
+      if (osm3dLayerInstanceRef.current && typeof osm3dLayerInstanceRef.current.tilt === 'function') {
+        osm3dLayerInstanceRef.current.tilt(35);
+      }
     } else {
+      // CORRETTO: Sfrutta il metodo nativo di rimozione layer di Leaflet per cancellare i palazzi a scomparsa all'istante
       if (osm3dLayerInstanceRef.current) {
-        // Rimuove lo strato 3D in modo pulito
-        osm3dLayerInstanceRef.current.destroy();
+        mapRef.current.removeLayer(osm3dLayerInstanceRef.current);
         osm3dLayerInstanceRef.current = null;
       }
     }
