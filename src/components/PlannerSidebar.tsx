@@ -12,6 +12,7 @@ interface SavedRoof {
   name: string;
   area: number;
   panelCount: number;
+  lengths: number[]; // Array di segmenti modificabili
 }
 
 interface PlannerSidebarProps {
@@ -38,6 +39,7 @@ interface PlannerSidebarProps {
   onSaveRoof: () => void;
   onRenameRoof: (id: string, name: string) => void;
   onDeleteRoof: (id: string) => void;
+  onUpdateLength: (id: string, index: number, newVal: number) => void; // Nuova prop per aggiornare i lati
   onGenerateReport: () => void;
   onResetPlanner: () => void;
 }
@@ -66,6 +68,7 @@ export default function PlannerSidebar({
   onSaveRoof,
   onRenameRoof,
   onDeleteRoof,
+  onUpdateLength,
   onGenerateReport,
   onResetPlanner
 }: PlannerSidebarProps) {
@@ -86,8 +89,8 @@ export default function PlannerSidebar({
           </span>
         </div>
         <div className="flex gap-2">
-          <input type="text" placeholder="Es: Via Casilina Sud, Ferentino" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-850 border border-zinc-750 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none" style={{ backgroundColor: '#27272a' }} />
-          <button type="submit" className="bg-zinc-850 border border-zinc-750 px-4 rounded-xl text-white transition" style={{ backgroundColor: '#27272a' }}>🔍</button>
+          <input type="text" placeholder="Es: Via Casilina Sud, Ferentino" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none" />
+          <button type="submit" className="bg-zinc-800 border border-zinc-700 px-4 rounded-xl text-white transition">🔍</button>
         </div>
       </form>
 
@@ -125,27 +128,51 @@ export default function PlannerSidebar({
         </div>
       )}
 
-      {/* 4. Aree Capannone */}
+      {/* 4. Aree Tetto Tracciate (Editabili in tempo reale) */}
       {savedRoofs.length > 0 && (
         <div className="space-y-3 animate-fadeIn">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-white flex items-center gap-1.5 font-sans">🏢 Aree Capannone</span>
+            <span className="text-sm font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-sans">🏢 Aree Tetto Tracciate</span>
             <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
               ℹ️
               <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
-                Falde salvate. Rinominale (es: Falda Nord) o eliminale. Fai clic sui moduli sulla mappa per eliminare camini o lucernari.
+                Lista dei tetti salvati. Puoi rinominarli ed anche **modificare i singoli lati in metri** se il rilievo satellitare presenta lievi sfasature!
               </span>
             </span>
           </div>
-          <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
+          <div className="space-y-3 max-h-64 overflow-y-auto no-scrollbar">
             {savedRoofs.map((roof) => (
-              <div key={roof.id} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 flex items-center justify-between gap-3">
-                <input type="text" value={roof.name} onChange={(e) => onRenameRoof(roof.id, e.target.value)} className="bg-transparent font-bold text-xs text-white border-b border-zinc-700 focus:outline-none flex-1" />
-                <div className="text-right shrink-0">
-                  <span className="text-xs text-zinc-300 block font-semibold">{Math.round(roof.area)} mq</span>
-                  <span className="text-[10px] text-emerald-400 block">{roof.panelCount} Moduli</span>
+              <div key={roof.id} className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <input type="text" value={roof.name} onChange={(e) => onRenameRoof(roof.id, e.target.value)} className="bg-transparent font-bold text-xs text-white border-b border-zinc-700 focus:outline-none flex-1 py-0.5" />
+                  <div className="text-right shrink-0">
+                    <span className="text-xs text-zinc-300 block font-semibold">{Math.round(roof.area)} mq</span>
+                    <span className="text-[10px] text-emerald-400 block">{roof.panelCount} Moduli</span>
+                  </div>
+                  <button onClick={() => onDeleteRoof(roof.id)} className="text-red-400 text-xs px-1">🗑️</button>
                 </div>
-                <button onClick={() => onDeleteRoof(roof.id)} className="text-red-400 text-xs">🗑️</button>
+
+                {/* VISUALIZZAZIONE E MODIFICA DEI SINGOLI LATI IN METRI */}
+                {roof.lengths && roof.lengths.length > 0 && (
+                  <div className="pt-2 border-t border-zinc-750 space-y-1.5">
+                    <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wide">📐 Modifica Lati (Metri):</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {roof.lengths.map((len, idx) => (
+                        <div key={idx} className="flex items-center space-x-1 bg-zinc-850 p-1.5 rounded-lg border border-zinc-700">
+                          <span className="text-[9px] text-zinc-500 font-bold font-mono">L{idx+1}:</span>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={Number(len.toFixed(1))}
+                            onChange={(e) => onUpdateLength(roof.id, idx, parseFloat(e.target.value) || 0)}
+                            className="w-10 bg-transparent text-[11px] font-bold text-white focus:outline-none" 
+                          />
+                          <span className="text-[9px] text-zinc-400">m</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -216,8 +243,8 @@ export default function PlannerSidebar({
         </button>
         <button onClick={onResetPlanner} className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl text-xs transition">
           Reset Progetto
-        </button>
-      </div>
+            </button>
+          </div>
     </div>
   );
 }
