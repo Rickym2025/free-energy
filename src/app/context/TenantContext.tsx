@@ -25,7 +25,7 @@ interface TenantContextType {
   refreshTenant: () => Promise<void>;
   deductCredits: (amount: number, description: string) => Promise<boolean>;
   activateService: (serviceName: 'nexus' | 'dentis', cost: number) => Promise<boolean>;
-  updateTenantState: (updated: Partial<Tenant>) => void; // Aggiunto per allineamento istantaneo
+  updateTenantState: (updated: Partial<Tenant>) => void;
   setTenantId: (id: string) => void;
 }
 
@@ -66,9 +66,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      if (!response.ok) {
-        throw new Error('Accesso non autorizzato (401/403)');
-      }
+      if (!response.ok) throw new Error('Accesso non autorizzato (401/403)');
 
       const data = await response.json();
       if (data && data.length > 0) {
@@ -85,13 +83,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         await createDemoTenantIfNotExist(id);
       }
     } catch (err: any) {
-      console.warn("Utilizzo cache locale o demo per sbloccare la Dashboard:", err.message);
-      // Se Supabase risponde con un 401, leggiamo l'ultimo valore valido salvato localmente
+      console.warn("Utilizzo cache locale:", err.message);
       const localCached = localStorage.getItem('fe_tenant_data');
       if (localCached) {
-        try {
-          setTenant(JSON.parse(localCached));
-        } catch (_) {}
+        try { setTenant(JSON.parse(localCached)); } catch (_) {}
       } else {
         setTenant({
           id: id,
@@ -159,12 +154,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     const savedId = localStorage.getItem('fe_tenant_id') || 'sipro-energy';
     setTenantIdState(savedId);
 
-    // Carica immediatamente i dati locali all'avvio (Zero ritardi visivi)
     const localCached = localStorage.getItem('fe_tenant_data');
     if (localCached) {
-      try {
-        setTenant(JSON.parse(localCached));
-      } catch (_) {}
+      try { setTenant(JSON.parse(localCached)); } catch (_) {}
     }
     fetchTenantData(savedId);
   }, []);
@@ -190,11 +182,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const deductCredits = async (amount: number, description: string): Promise<boolean> => {
     if (!tenant) return false;
-    
-    if (tenant.credits > 500000) {
-      return true;
-    }
-
+    if (tenant.credits > 500000) return true;
     if (tenant.credits < amount) {
       alert("Crediti insufficienti.");
       return false;
@@ -225,7 +213,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const activateService = async (serviceName: 'nexus' | 'dentis', cost: number): Promise<boolean> => {
     if (!tenant) return false;
-    
     const success = await deductCredits(cost, `Attivazione modulo: ${serviceName.toUpperCase()}`);
     if (!success) return false;
 
