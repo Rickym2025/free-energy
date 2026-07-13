@@ -20,20 +20,14 @@ interface Candidate {
   created_at: string;
 }
 
-// Funzioni di sanificazione per evitare errori di copiatura (spazi, virgolette, slash finali)
-const sanitizeUrl = (url: string) => {
-  return url.replace(/^["']|["']$/g, '').trim().replace(/\/$/, '');
+// Funzione di inizializzazione ultra-sicura per prevenire stringhe "undefined" o vuote
+const getEnvVar = (value: string | undefined, fallback: string): string => {
+  if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
+  return value.replace(/^["']|["']$/g, '').trim();
 };
 
-const sanitizeKey = (key: string) => {
-  return key.replace(/^["']|["']$/g, '').trim();
-};
-
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
-const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
-
-const SUPABASE_URL = sanitizeUrl(rawUrl);
-const SUPABASE_ANON_KEY = sanitizeKey(rawKey);
+const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
+const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
 
 export default function CvEvaluator() {
   const { tenant, deductCredits } = useTenant();
@@ -110,7 +104,6 @@ export default function CvEvaluator() {
   const handleAnalyzeNewCv = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // RIMOSSO !tenant da questa riga di controllo iniziale per prevenire il blocco silenzioso
     if (!candidateName.trim() || !selectedFile || isAnalyzing) return;
 
     setIsAnalyzing(true);
@@ -145,22 +138,28 @@ export default function CvEvaluator() {
     };
 
     try {
-      // Se il tenant non è stato caricato a causa dell'errore 400 di Supabase, forziamo l'errore per andare nel catch
+      // Se il tenant non è stato caricato, forziamo l'errore per andare nel catch
       if (!tenant) {
         throw new Error("Dati tenant non disponibili (Supabase offline o non configurato)");
       }
 
-      // Spostato qui dentro: se il portafoglio crediti fallisce per problemi di rete, si attiva il paracadute
+      // 1. Sottrazione crediti
       const success = await deductCredits(50, `Screening CV: ${candidateName}`);
       if (!success) {
         throw new Error("Transazione crediti non autorizzata o fallita");
       }
 
-      // 1. Prova di upload su Supabase Storage
+      // 2. Preparazione dei nomi dei file
       const fileExt = selectedFile.name.split('.').pop();
       const uniqueFileName = `cv-${Date.now()}.${fileExt}`;
-      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/public/cv/${uniqueFileName}`;
+      
+      // Percorso corretto per l'UPLOAD (POST) su Supabase Storage (senza "/public/")
+      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/cv/${uniqueFileName}`;
+      
+      // Percorso corretto per lo scaricamento pubblico (GET) da inviare a n8n (con "/public/")
+      const publicDownloadUrl = `${SUPABASE_URL}/storage/v1/object/public/cv/${uniqueFileName}`;
 
+      // 3. Prova reale di upload su Supabase Storage
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
@@ -172,10 +171,12 @@ export default function CvEvaluator() {
       });
 
       if (!uploadResponse.ok) {
+        const errText = await uploadResponse.text();
+        console.error("Dettaglio errore upload:", errText);
         throw new Error("Supabase Storage bloccato o non configurato");
       }
 
-      // 2. Chiamata reale al Webhook n8n
+      // 4. Chiamata reale al Webhook n8n (passando l'URL pubblico di download)
       const n8nResponse = await fetch("https://n8n.rmstudio.app/webhook/compare-cv", {
         method: 'POST',
         headers: {
@@ -185,7 +186,7 @@ export default function CvEvaluator() {
           tenant_id: tenant.id,
           candidate_name: candidateName,
           applied_role: extractedJobTitle,
-          cv_file_url: uploadUrl
+          cv_file_url: publicDownloadUrl
         })
       });
 
@@ -193,7 +194,7 @@ export default function CvEvaluator() {
         throw new Error("n8n Webhook bloccato da policy CORS o offline");
       }
 
-      // Se tutto va a buon fine, pulisce il form e ricarica i dati aggiornati dal database
+      // Se tutto va a buon fine, pulisce il form e ricarica i dati dal database
       setCandidateName('');
       setFileName(null);
       setSelectedFile(null);
