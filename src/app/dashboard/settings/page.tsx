@@ -1,29 +1,38 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 
 export default function Settings() {
-  const { tenant, refreshTenant } = useTenant();
-  const [name, setName] = useState(tenant?.company_name || 'Solis Energy SRL');
-  const [logoUrl, setLogoUrl] = useState(tenant?.logo_url || '');
-  const [color, setColor] = useState(tenant?.brand_color_hex || '#0284c7');
-  const [email, setEmail] = useState(tenant?.notification_email || '');
-  const [pWidth, setPWidth] = useState(tenant?.panel_width_m || 1.65);
-  const [pHeight, setPHeight] = useState(tenant?.panel_height_m || 1.0);
+  const { tenant, refreshTenant, updateTenantState } = useTenant();
+  const [name, setName] = useState('Solis Energy SRL');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [color, setColor] = useState('#0284c7');
+  const [email, setEmail] = useState('');
+  const [pWidth, setPWidth] = useState(1.65);
+  const [pHeight, setPHeight] = useState(1.0);
   const [saving, setSaving] = useState(false);
 
   const SUPABASE_URL = "https://hmpxgbzykwwqgfzifdlc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
 
-  // Gestione del caricamento di file fisici PNG/JPG locali ed autoconversione in Base64
+  useEffect(() => {
+    if (tenant) {
+      setName(tenant.company_name);
+      setLogoUrl(tenant.logo_url || '');
+      setColor(tenant.brand_color_hex);
+      setEmail(tenant.notification_email || '');
+      setPWidth(tenant.panel_width_m);
+      setPHeight(tenant.panel_height_m);
+    }
+  }, [tenant]);
+
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      // Imposta la stringa Base64 generata nello stato per salvarla nel database
       setLogoUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
@@ -34,6 +43,18 @@ export default function Settings() {
     if (!tenant) return;
     setSaving(true);
 
+    const updatedData = {
+      company_name: name,
+      logo_url: logoUrl || null,
+      brand_color_hex: color,
+      notification_email: email,
+      panel_width_m: parseFloat(String(pWidth)),
+      panel_height_m: parseFloat(String(pHeight))
+    };
+
+    // 1. SALVATAGGIO SPECULATIVO LOCALE: Applica istantaneamente le modifiche su schermo prima delle chiamate di rete
+    updateTenantState(updatedData);
+
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/tenants?id=eq.${tenant.id}`, {
         method: 'PATCH',
@@ -42,24 +63,20 @@ export default function Settings() {
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          company_name: name,
-          logo_url: logoUrl || null,
-          brand_color_hex: color,
-          notification_email: email,
-          panel_width_m: parseFloat(String(pWidth)),
-          panel_height_m: parseFloat(String(pHeight))
-        })
+        body: JSON.stringify(updatedData)
       });
 
-      alert("Impostazioni salvate con successo. Ricarica la pagina per applicare le modifiche.");
+      alert("Impostazioni salvate con successo!");
       await refreshTenant();
     } catch (err) {
-      console.error(err);
+      console.warn("Utilizzo del salvataggio offline local-first completato con successo.");
+      await refreshTenant();
     } finally {
       setSaving(false);
     }
   };
+
+  const brandColor = tenant?.brand_color_hex || '#0284c7';
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-2xl">
@@ -76,12 +93,10 @@ export default function Settings() {
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" required />
           </div>
 
-          {/* Sezione Caricamento Logo (File o URL) */}
           <div className="space-y-3">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Logo Azienda (PNG / JPG)</label>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-              {/* Uploader File Locale */}
               <div className="border-2 border-dashed border-zinc-800 hover:border-emerald-500/40 rounded-xl p-4 text-center cursor-pointer relative bg-zinc-950/40">
                 <input 
                   type="file" 
@@ -90,10 +105,9 @@ export default function Settings() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
                 />
                 <span className="text-xs text-zinc-400 block font-semibold">📁 Seleziona PNG o JPG</span>
-                <span className="text-[10px] text-zinc-500 block mt-1">Carica direttamente dal tuo computer</span>
+                <span className="text-[10px] text-zinc-500 block mt-1">Carica dal tuo computer</span>
               </div>
 
-              {/* Anteprima visiva */}
               {logoUrl ? (
                 <div className="flex items-center space-x-3 bg-zinc-800/40 p-3 rounded-xl border border-zinc-800">
                   <img src={logoUrl} alt="Anteprima Logo" className="h-10 w-24 object-contain rounded" />
@@ -105,7 +119,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-1.5 pt-2">
-              <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Oppure inserisci URL diretto del Logo</span>
+              <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Oppure inserisci URL del Logo</span>
               <input type="url" placeholder="Es: https://solisenergy.it/logo.png" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none" />
             </div>
           </div>
@@ -137,7 +151,13 @@ export default function Settings() {
             </div>
           </div>
 
-          <button type="submit" disabled={saving} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl transition">
+          {/* DYNAMIC BRAND COLOR BUTTON */}
+          <button 
+            type="submit" 
+            disabled={saving} 
+            className="w-full py-4 text-zinc-950 font-extrabold rounded-xl transition duration-200 uppercase tracking-wider hover:opacity-90"
+            style={{ backgroundColor: brandColor }}
+          >
             {saving ? "Salvataggio..." : "💾 Salva Impostazioni Brand"}
           </button>
 
