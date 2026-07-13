@@ -15,8 +15,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showRicaricaModal, setShowRicaricaModal] = useState(false);
 
-  // Chatbot Aurora AI: impostato ad APERTURA AUTOMATICA di default (true)
   const [chatOpen, setChatOpen] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'init-1', text: "Ciao! Sono Aurora, l'assistente virtuale ed ingegneristico di Free Energy. Sono qui per aiutarti a tracciare i tuoi capannoni ed attivare i moduli. Come posso esserti utile oggi?", sender: 'bot' }
@@ -25,7 +25,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // CORRETTO: Inserito l'indirizzo del webhook di Aurora AI
   const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/aurora-chatbot';
 
   useEffect(() => {
@@ -81,7 +80,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Suddivisione strategica dei menu per aree operative e colori distintivi
   const sidebarGroups = [
     {
       title: "Produzione & CRM",
@@ -135,6 +133,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 space-y-6 flex-shrink-0">
+        
+        {/* Intestazione */}
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm" style={{ backgroundColor: brandColor }}>
             {tenant?.company_name.substring(0, 2).toUpperCase()}
@@ -142,6 +142,19 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <span className="font-bold text-lg text-white tracking-tight">{tenant?.company_name}</span>
         </div>
 
+        {/* CORRETTO: Spostato i Crediti Attivi in CIMA alla colonna per renderli visibili senza scroll */}
+        <div 
+          onClick={() => setShowRicaricaModal(true)}
+          className="bg-zinc-850/80 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:border-emerald-500/40 transition duration-200"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase">Crediti Attivi</span>
+            <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-wide">💳 Ricarica</span>
+          </div>
+          <span className="text-2xl font-black text-white mt-1 block">{tenant?.credits.toLocaleString()}</span>
+        </div>
+
+        {/* Menu Navigazione */}
         <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar">
           {sidebarGroups.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-2">
@@ -178,11 +191,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
-
-        <div className="bg-zinc-850/60 border border-zinc-800 p-4 rounded-2xl">
-          <span className="text-xs font-semibold text-zinc-400 uppercase block">Crediti Attivi</span>
-          <span className="text-2xl font-black text-white mt-1 block">{tenant?.credits.toLocaleString()}</span>
-        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -190,7 +198,46 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Chatbot Galleggiante Aurora AI */}
+      {/* Finestra Modale per Ricarica Crediti */}
+      {showRicaricaModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn print:hidden">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-md relative space-y-6">
+            <button 
+              onClick={() => setShowRicaricaModal(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+            >
+              ✕
+            </button>
+            <div className="text-center">
+              <span className="text-3xl block mb-2">💳</span>
+              <h2 className="text-xl font-bold text-white">Ricarica Crediti Free Energy</h2>
+              <p className="text-xs text-zinc-400 mt-1">Scegli un pacchetto prepagato senza scadenze per alimentare i tuoi preventivi.</p>
+            </div>
+
+            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-white text-sm block">Start Pack (Consigliato)</span>
+                <span className="text-[10px] text-zinc-400 block mt-0.5">Include 10.000 crediti prepagati</span>
+              </div>
+              <div className="text-right">
+                <span className="text-xl font-black text-emerald-400">€ 199</span>
+                <span className="text-[10px] text-zinc-500 block">una tantum</span>
+              </div>
+            </div>
+
+            <a 
+              href="https://buy.stripe.com/test_free_energy_ricarica" 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-xs uppercase tracking-wider block text-center transition"
+            >
+              Acquista ora su Stripe
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Chatbot Galleggiante */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
         {chatOpen && (
           <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
