@@ -59,7 +59,7 @@ export default function ReportPreview({
             background: white !important; 
             color: black !important; 
           }
-          /* Visualizza e formatta la mappa satellitare integrata nel PDF stampato */
+          /* Forza la visualizzazione a colori e le proporzioni della mappa nel PDF */
           #map-pv { 
             display: block !important; 
             height: 280px !important; 
@@ -71,16 +71,16 @@ export default function ReportPreview({
         }
       `}} />
 
-      {/* Intestazione Commerciale */}
-      <div className="flex items-start justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
+      {/* CORRETTO: Inserito print:hidden per evitare intestazioni duplicate, poiché ora viene stampata quella unificata del foglio */}
+      <div className="flex items-start justify-between border-b border-zinc-800 pb-6 print:hidden">
         <div className="space-y-1">
-          <h2 className="text-2xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
-          <p className="text-xs text-zinc-400 print:text-zinc-600 font-medium">Offerta economica per impianto fotovoltaico connesso in rete con formula "chiavi in mano"</p>
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
+          <p className="text-xs text-zinc-400 font-medium">Offerta economica per impianto fotovoltaico connesso in rete con formula "chiavi in mano"</p>
           {address && <p className="text-xs text-zinc-500 font-semibold mt-1">📍 Edificio / Capannone sito in: {address}</p>}
         </div>
         
-        <div className="text-right text-xs text-zinc-400 print:text-zinc-700 space-y-1">
-          <span className="font-bold text-white print:text-black text-sm block">Riferimenti Commerciali</span>
+        <div className="text-right text-xs text-zinc-400 space-y-1">
+          <span className="font-bold text-white text-sm block">Riferimenti Commerciali</span>
           <p>Email: {tenant?.notification_email || 'tecnico@novasolar.it'}</p>
           <p>Data Offerta: {new Date().toLocaleDateString()}</p>
         </div>
