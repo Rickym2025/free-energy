@@ -25,7 +25,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/aurora-chatbot';
+  const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -131,8 +131,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-transparent text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
       
-      {/* Sidebar Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 space-y-6 flex-shrink-0">
+      {/* CORRETTO: Bloccata l'altezza ad h-screen sticky per impedire ai crediti di scorrere */}
+      <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 space-y-6 flex-shrink-0 z-40">
         
         {/* Intestazione */}
         <div className="flex items-center space-x-3">
@@ -142,7 +142,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <span className="font-bold text-lg text-white tracking-tight">{tenant?.company_name}</span>
         </div>
 
-        {/* CORRETTO: Spostato i Crediti Attivi in CIMA alla colonna per renderli visibili senza scroll */}
+        {/* Crediti Attivi fissi in primo piano */}
         <div 
           onClick={() => setShowRicaricaModal(true)}
           className="bg-zinc-850/80 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:border-emerald-500/40 transition duration-200"
@@ -154,7 +154,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <span className="text-2xl font-black text-white mt-1 block">{tenant?.credits.toLocaleString()}</span>
         </div>
 
-        {/* Menu Navigazione */}
+        {/* Menu Navigazione Interno */}
         <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar">
           {sidebarGroups.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-2">
