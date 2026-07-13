@@ -17,7 +17,7 @@ interface MapPlannerProps {
   mapCenter: Coordinate | null;
   onMapClick: (point: Coordinate) => void;
   onPanelDeleted: (roofId: string) => void;
-  onMarkerDrag: (index: number, newCoord: Coordinate) => void; // Riceve la prop del drag
+  onMarkerDrag: (index: number, newCoord: Coordinate) => void;
 }
 
 export default function MapPlanner({
@@ -40,7 +40,7 @@ export default function MapPlanner({
   const panelsLayerGroupRef = useRef<any>(null);
 
   const [mapReady, setMapReady] = useState(false);
-  const [osm3dActive, setOsm3dActive] = useState(false); // Stato pulsante 3D Buildings
+  const [osm3dActive, setOsm3dActive] = useState(false); 
   const osm3dLayerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Aggiorna tetti, pannelli e quotature grandi
+  // Aggiorna reattivamente tetti, moduli e quote metriche allineandole alle modifiche manuali dell'utente
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -91,20 +91,27 @@ export default function MapPlanner({
       }).addTo(savedRoofsLayerGroupRef.current);
 
       drawPanelsForRoof(roof.points, roof.id);
-      drawSegmentLengths(roof.points, savedRoofsLayerGroupRef.current);
+
+      // CORRETTO: Passa l'array di lunghezze ridenominate/modificate come sormonto (override)
+      drawSegmentLengths(roof.points, savedRoofsLayerGroupRef.current, false, roof.lengths);
     });
   }, [panelRotation, savedRoofs, mapReady]);
 
-  // Gestione dei segnaposto temporanei drag-and-drop
+  // Gestione dinamica dei segnaposto ed eliminazione immediata delle quote residue al reset
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
+
+    // CORRETTO: Pulisce e distrugge tassativamente le quote temporanee residue in memoria per non lasciarle appese
+    if ((window as any).tempLengthMarkers) {
+      (window as any).tempLengthMarkers.forEach((m: any) => m.remove());
+      (window as any).tempLengthMarkers = [];
+    }
 
     activeMarkersRef.current.forEach(m => m.remove());
     activeMarkersRef.current = [];
 
     currentPoints.forEach((p, idx) => {
-      // CORRETTO: Impostato draggable: true ed aggiunto l'ascoltatore 'dragend' per ricalcolare in tempo reale
       const marker = L.marker([p.lat, p.lng], { draggable: true }).addTo(mapRef.current);
       
       marker.on('dragend', (e: any) => {
@@ -167,7 +174,6 @@ export default function MapPlanner({
     });
   };
 
-  // Attiva ed inietta la vista 3D vettoriale semitrasparente di OSM Buildings
   const handleToggle3D = () => {
     const L = (window as any).L;
     if (!L || !mapRef.current) return;
@@ -176,9 +182,9 @@ export default function MapPlanner({
     setOsm3dActive(nextState);
 
     if (nextState) {
-      // Iniezione del layer OSM Buildings 3D semitrasparente (Non copre le foto aeree del satellite)
-      osm3dLayerRef.current = L.tileLayer('https://{s}.tiles.mapbox.com/v3/osmbuildings.london-features/{z}/{y}/{x}.png', {
-        opacity: 0.4,
+      // CORRETTO: Sostituito l'endpoint Mapbox 410 con il server ufficiale e gratuito di OSM Buildings
+      osm3dLayerRef.current = L.tileLayer('https://tile.osmbuildings.org/0.2/anonymous/tile/{z}/{x}/{y}.png', {
+        opacity: 0.5,
         maxZoom: 22
       }).addTo(mapRef.current);
     } else {
@@ -189,7 +195,8 @@ export default function MapPlanner({
     }
   };
 
-  const drawSegmentLengths = (points: Coordinate[], targetLayer: any, isTemporary = false) => {
+  // Calcola e disegna le quote metriche, accettando opzionalmente l'array modificato dall'utente
+  const drawSegmentLengths = (points: Coordinate[], targetLayer: any, isTemporary = false, lengthsOverride?: number[]) => {
     const L = (window as any).L;
     if (!L || points.length < 2) return;
 
@@ -206,12 +213,15 @@ export default function MapPlanner({
 
       const latlng1 = L.latLng(p1.lat, p1.lng);
       const latlng2 = L.latLng(p2.lat, p2.lng);
-      const distanceMeters = latlng1.distanceTo(latlng2);
+
+      // CORRETTO: Se l'utente ha modificato manualmente la lunghezza nella scheda, mostra quella sul badge
+      const distanceMeters = (lengthsOverride && lengthsOverride[i] !== undefined)
+        ? lengthsOverride[i]
+        : latlng1.distanceTo(latlng2);
 
       const midLat = (p1.lat + p2.lat) / 2;
       const midLng = (p1.lng + p2.lng) / 2;
 
-      // CORRETTO: Badge metrico aumentato a text-xs, font-black e bordo rinforzato per la massima visibilità
       const lengthMarker = L.marker([midLat, midLng], {
         icon: L.divIcon({
           className: 'bg-zinc-950/95 border-2 border-emerald-500/80 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-2xl pointer-events-none whitespace-nowrap',
@@ -294,7 +304,6 @@ export default function MapPlanner({
     <div className="w-full h-full relative">
       <div id="map-pv" className="w-full h-full z-10" />
       
-      {/* Tasto toggle per attivare la vista 3D semitrasparente dei palazzi */}
       <button 
         onClick={handleToggle3D}
         className="absolute top-4 right-4 z-20 bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white font-extrabold text-[10px] px-3.5 py-2.5 rounded-xl uppercase tracking-wider shadow-2xl transition"
