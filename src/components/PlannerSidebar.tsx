@@ -12,7 +12,7 @@ interface SavedRoof {
   name: string;
   area: number;
   panelCount: number;
-  lengths: number[]; // Array di segmenti modificabili
+  lengths: number[];
 }
 
 interface PlannerSidebarProps {
@@ -22,6 +22,7 @@ interface PlannerSidebarProps {
   setPanelRotation: (val: number) => void;
   currentPoints: Coordinate[];
   savedRoofs: SavedRoof[];
+  selectedRoofId: string | null; // Riceve il tetto selezionato
   costPerPanel: number;
   setCostPerPanel: (val: number) => void;
   fixedCosts: number;
@@ -39,9 +40,10 @@ interface PlannerSidebarProps {
   onSaveRoof: () => void;
   onRenameRoof: (id: string, name: string) => void;
   onDeleteRoof: (id: string) => void;
-  onUpdateLength: (id: string, index: number, newVal: number) => void; // Nuova prop per aggiornare i lati
+  onUpdateLength: (id: string, index: number, newVal: number) => void;
   onGenerateReport: () => void;
   onResetPlanner: () => void;
+  onSelectRoof: (id: string | null) => void; // Callback per selezionare un tetto
 }
 
 export default function PlannerSidebar({
@@ -51,6 +53,7 @@ export default function PlannerSidebar({
   setPanelRotation,
   currentPoints,
   savedRoofs,
+  selectedRoofId,
   costPerPanel,
   setCostPerPanel,
   fixedCosts,
@@ -70,7 +73,8 @@ export default function PlannerSidebar({
   onDeleteRoof,
   onUpdateLength,
   onGenerateReport,
-  onResetPlanner
+  onResetPlanner,
+  onSelectRoof
 }: PlannerSidebarProps) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6 print:hidden">
@@ -128,7 +132,7 @@ export default function PlannerSidebar({
         </div>
       )}
 
-      {/* 4. Aree Tetto Tracciate (Editabili in tempo reale) */}
+      {/* 4. Aree Tetto Tracciate (Editabili e Selezionabili) */}
       {savedRoofs.length > 0 && (
         <div className="space-y-3 animate-fadeIn">
           <div className="flex items-center justify-between">
@@ -136,45 +140,65 @@ export default function PlannerSidebar({
             <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
               ℹ️
               <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
-                Lista dei tetti salvati. Puoi rinominarli ed anche **modificare i singoli lati in metri** se il rilievo satellitare presenta lievi sfasature!
+                Lista dei tetti salvati. Fai clic su una riga per selezionarla ed attivare i pin trascinabili sulla mappa satellitare!
               </span>
             </span>
           </div>
           <div className="space-y-3 max-h-64 overflow-y-auto no-scrollbar">
-            {savedRoofs.map((roof) => (
-              <div key={roof.id} className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <input type="text" value={roof.name} onChange={(e) => onRenameRoof(roof.id, e.target.value)} className="bg-transparent font-bold text-xs text-white border-b border-zinc-700 focus:outline-none flex-1 py-0.5" />
-                  <div className="text-right shrink-0">
-                    <span className="text-xs text-zinc-300 block font-semibold">{Math.round(roof.area)} mq</span>
-                    <span className="text-[10px] text-emerald-400 block">{roof.panelCount} Moduli</span>
-                  </div>
-                  <button onClick={() => onDeleteRoof(roof.id)} className="text-red-400 text-xs px-1">🗑️</button>
-                </div>
-
-                {/* VISUALIZZAZIONE E MODIFICA DEI SINGOLI LATI IN METRI */}
-                {roof.lengths && roof.lengths.length > 0 && (
-                  <div className="pt-2 border-t border-zinc-750 space-y-1.5">
-                    <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wide">📐 Modifica Lati (Metri):</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {roof.lengths.map((len, idx) => (
-                        <div key={idx} className="flex items-center space-x-1 bg-zinc-850 p-1.5 rounded-lg border border-zinc-700">
-                          <span className="text-[9px] text-zinc-500 font-bold font-mono">L{idx+1}:</span>
-                          <input 
-                            type="number" 
-                            step="0.1"
-                            value={Number(len.toFixed(1))}
-                            onChange={(e) => onUpdateLength(roof.id, idx, parseFloat(e.target.value) || 0)}
-                            className="w-10 bg-transparent text-[11px] font-bold text-white focus:outline-none" 
-                          />
-                          <span className="text-[9px] text-zinc-400">m</span>
-                        </div>
-                      ))}
+            {savedRoofs.map((roof) => {
+              const isSelected = selectedRoofId === roof.id;
+              return (
+                <div 
+                  key={roof.id} 
+                  onClick={() => onSelectRoof(isSelected ? null : roof.id)}
+                  className={`p-4 rounded-xl border transition cursor-pointer space-y-3 ${
+                    isSelected ? 'bg-zinc-800/80 border-emerald-500/80' : 'bg-zinc-800 border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <input 
+                      type="text" 
+                      value={roof.name} 
+                      onClick={(e) => e.stopPropagation()} // Previene la de-selezione al clic sul testo
+                      onChange={(e) => onRenameRoof(roof.id, e.target.value)} 
+                      className="bg-transparent font-bold text-xs text-white border-b border-zinc-700 focus:border-emerald-500 focus:outline-none flex-1 py-0.5" 
+                    />
+                    <div className="text-right shrink-0">
+                      <span className="text-xs text-zinc-300 block font-semibold">{Math.round(roof.area)} mq</span>
+                      <span className="text-[10px] text-emerald-400 block">{roof.panelCount} Moduli</span>
                     </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onDeleteRoof(roof.id); }} 
+                      className="text-red-400 text-xs px-1"
+                    >
+                      🗑️
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Visualizzazione delle misure dei lati editabili in tempo reale */}
+                  {roof.lengths && roof.lengths.length > 0 && (
+                    <div className="pt-2 border-t border-zinc-750 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wide">📐 Modifica Lati (Metri):</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {roof.lengths.map((len, idx) => (
+                          <div key={idx} className="flex items-center space-x-1 bg-zinc-850 p-1.5 rounded-lg border border-zinc-700">
+                            <span className="text-[9px] text-zinc-500 font-bold font-mono">L{idx+1}:</span>
+                            <input 
+                              type="number" 
+                              step="0.1"
+                              value={Number(len.toFixed(1))}
+                              onChange={(e) => onUpdateLength(roof.id, idx, parseFloat(e.target.value) || 0)}
+                              className="w-10 bg-transparent text-[11px] font-bold text-white focus:outline-none" 
+                            />
+                            <span className="text-[9px] text-zinc-400 font-mono">m</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -243,8 +267,8 @@ export default function PlannerSidebar({
         </button>
         <button onClick={onResetPlanner} className="w-full py-2 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-xl text-xs transition">
           Reset Progetto
-            </button>
-          </div>
+        </button>
+      </div>
     </div>
   );
 }
