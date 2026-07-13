@@ -33,7 +33,7 @@ export default function PvPlanner() {
   const [panelRotation, setPanelRotation] = useState(0); 
   const [mapCenter, setMapCenter] = useState<Coordinate | null>(null);
 
-  // Parametri economici
+  // Configurazione dei parametri economici
   const [costPerPanel, setCostPerPanel] = useState(450); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
@@ -74,9 +74,12 @@ export default function PvPlanner() {
     setCurrentPoints(prev => [...prev, point]);
   };
 
-  // CORRETTO: Inserita la funzione di annullamento punto temporaneo
   const handleUndoLastPoint = () => {
     setCurrentPoints(prev => prev.slice(0, -1));
+  };
+
+  const clearMapPoints = () => {
+    setCurrentPoints([]);
   };
 
   const handleSaveCurrentRoof = () => {
@@ -84,63 +87,67 @@ export default function PvPlanner() {
       alert("Definisci almeno 3 segnaposto sulla mappa prima di salvare.");
       return;
     }
+
     const area = calculateAreaInSqm(currentPoints);
+    const roofId = `roof-${Date.now()}`;
+
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
     const panelCount = calculatePanelCount(currentPoints, pWidth, pHeight, panelRotation);
 
-    setSavedRoofs(prev => [...prev, { id: `roof-${Date.now()}`, name: `Area Tetto #${savedRoofs.length + 1}`, points: currentPoints, area, panelCount }]);
-    setCurrentPoints([]);
+    const newRoof: SavedRoof = {
+      id: roofId,
+      name: `Area Tetto #${savedRoofs.length + 1}`,
+      points: currentPoints,
+      area,
+      panelCount
+    };
+
+    setSavedRoofs(prev => [...prev, newRoof]);
+    clearMapPoints();
   };
 
   const handlePanelDeleted = (roofId: string) => {
-    setSavedRoofs(prev => prev.map(r => r.id === roofId ? { ...r, panelCount: Math.max(0, r.panelCount - 1) } : r));
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === roofId) {
+        return { ...r, panelCount: Math.max(0, r.panelCount - 1) };
+      }
+      return r;
+    }));
   };
 
-  // CORRETTO: Inserita la funzione di cancellazione dell'area salvata
   const handleDeleteRoof = (id: string) => {
     setSavedRoofs(prev => prev.filter(r => r.id !== id));
   };
 
-  // CORRETTO: Inserita la funzione di rinomina dell'area salvata
   const handleRenameRoof = (id: string, newName: string) => {
-    setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!address) return;
-    setLoadingGeocode(true);
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-      const data = await response.json();
-      if (data && data.length > 0) {
-        setMapCenter({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
-        handleResetPlanner();
-      } else {
-        alert("Indirizzo non trovato.");
+    setSavedRoofs(prev => prev.map(r => {
+      if (r.id === id) {
+        return { ...r, name: newName };
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingGeocode(false);
-    }
+      return r;
+    }));
   };
 
   const handleGenerateReport = async () => {
     if (savedRoofs.length === 0) {
-      alert("Traccia e conferma almeno un'area prima di procedere.");
+      alert("Traccia e conferma almeno un'area del tetto prima di procedere.");
       return;
     }
+
     const totalArea = savedRoofs.reduce((acc, r) => acc + r.area, 0);
     setTotalAreaSqm(totalArea);
+
     const totalActualPanels = savedRoofs.reduce((acc, r) => acc + r.panelCount, 0);
     const estimPeakPower = totalActualPanels * 0.430; 
     setPeakPower(estimPeakPower);
 
     let costTotal = (totalActualPanels * costPerPanel) + fixedCosts;
-    if (includeStorage) costTotal += (storageCapacity * costPerKwhStorage);
-    setEstimatedCost(Math.round(costTotal));
+    if (includeStorage) {
+      costTotal += (storageCapacity * costPerKwhStorage);
+    }
+    const finalCostCalculated = Math.round(costTotal);
+    setEstimatedCost(finalCostCalculated);
 
     const success = await deductCredits(150, `Studio di Fattibilità Industriale (${savedRoofs.length} falde): ${address}`);
     if (!success) return;
@@ -155,8 +162,10 @@ export default function PvPlanner() {
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, productionVal * 0.25));
       setIsCalculated(true);
     } catch (err) {
-      setAnnualProduction(estimPeakPower * 1350);
-      setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, estimPeakPower * 1350 * 0.25));
+      console.warn("Calcolo locale di fallback energetico");
+      const localProductionEstimate = estimPeakPower * 1350;
+      setAnnualProduction(localProductionEstimate);
+      setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, localProductionEstimate * 0.25));
       setIsCalculated(true);
     } finally {
       setLoadingGeocode(false);
@@ -164,9 +173,31 @@ export default function PvPlanner() {
   };
 
   const handleResetPlanner = () => {
-    setCurrentPoints([]);
+    clearMapPoints();
     setSavedRoofs([]);
     setIsCalculated(false);
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address) return;
+    setLoadingGeocode(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const newCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
+        handleResetPlanner();
+        setMapCenter(newCoords);
+      } else {
+        alert("Indirizzo non trovato.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingGeocode(false);
+    }
   };
 
   const panelCount = totalAreaSqm ? Math.floor(totalAreaSqm / 1.65) : 0;
