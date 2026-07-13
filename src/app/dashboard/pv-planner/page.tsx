@@ -31,6 +31,9 @@ export default function PvPlanner() {
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
   const [panelRotation, setPanelRotation] = useState(0); 
 
+  // Stato per la gestione reattiva delle coordinate cercate
+  const [mapCenter, setMapCenter] = useState<Coordinate | null>(null);
+
   // Configurazione dei parametri economici
   const [costPerPanel, setCostPerPanel] = useState(450); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
@@ -117,7 +120,6 @@ export default function PvPlanner() {
     }));
   };
 
-  // CORRETTO: Modificata in cancellazione puramente dichiarativa senza richiami diretti a classi Leaflet
   const handleDeleteRoof = (id: string) => {
     setSavedRoofs(prev => prev.filter(r => r.id !== id));
   };
@@ -191,11 +193,9 @@ export default function PvPlanner() {
         const { lat, lon } = data[0];
         const newCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
         handleResetPlanner();
-        const L = (window as any).L;
-        const map = (window as any).mapRef?.current; 
-        if (map) {
-          map.setView([newCoords.lat, newCoords.lng], 19);
-        }
+        
+        // AGGIORNATO: Imposta le coordinate reattive per MapPlanner
+        setMapCenter(newCoords);
       } else {
         alert("Indirizzo non trovato.");
       }
@@ -232,27 +232,57 @@ export default function PvPlanner() {
         
         {/* Barra di comando */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6 print:hidden">
+          
+          {/* Sezione 1: Trova Area */}
           <form onSubmit={handleSearch} className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Disegna impianto</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                🗺️ Trova area impianto
+              </label>
+              <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Digita l'indirizzo esatto dell'immobile per allineare automaticamente le immagini del satellite sul tetto.
+                </span>
+              </span>
+            </div>
             <div className="flex gap-2">
-              <input type="text" placeholder="Es: Zona Industriale, Frosinone" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
+              <input type="text" placeholder="Es: Via Casilina Sud, Ferentino" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
               <button type="submit" className="bg-zinc-800 border border-zinc-700 px-4 rounded-xl text-white transition">🔍</button>
             </div>
           </form>
 
-          {/* Slider di rotazione manuale */}
+          {/* Sezione 2: Rotazione Pannelli */}
           <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
-              <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
+              <span className="text-xs font-bold text-white flex items-center gap-1.5 font-sans">
+                🔄 Rotazione Pannelli
+              </span>
+              <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Trascina il cursore per inclinare e ruotare i pannelli fotovoltaici allineandoli parallelamente alle linee del tetto.
+                </span>
+              </span>
             </div>
             <input type="range" min="0" max="360" value={panelRotation} onChange={(e) => setPanelRotation(parseInt(e.target.value))} className="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-            <span className="text-[10px] text-zinc-500 block">Trascina per allineare perfettamente i pannelli alla grondaia.</span>
           </div>
 
+          {/* Sezione 3: Tracciamento Corrente */}
           {currentPoints.length > 0 && (
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
-              <span className="text-xs font-bold text-white block">Tracciamento Falda Corrente</span>
+            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5 font-sans">
+                  📐 Tracciamento Corrente
+                </span>
+                <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                  ℹ️
+                  <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                    Fai clic sui vertici del tetto. Se sbagli puoi annullare l'ultimo punto o premere "Salva" per posizionare i moduli.
+                  </span>
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400">Segnaposto inseriti: <strong className="text-emerald-400">{currentPoints.length}</strong></p>
               <div className="flex gap-2">
                 <button onClick={handleUndoLastPoint} className="flex-1 py-2 bg-zinc-700 text-white text-xs font-bold rounded-lg">Annulla Punto</button>
                 <button onClick={handleSaveCurrentRoof} className="flex-1 py-2 bg-emerald-500 text-zinc-950 font-bold text-xs rounded-lg">Salva Falda</button>
@@ -260,9 +290,20 @@ export default function PvPlanner() {
             </div>
           )}
 
+          {/* Sezione 4: Elenco Aree */}
           {savedRoofs.length > 0 && (
-            <div className="space-y-3">
-              <span className="text-xs font-bold text-zinc-400 uppercase block">Aree Capannone</span>
+            <div className="space-y-3 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                  🏢 Aree Capannone
+                </span>
+                <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                  ℹ️
+                  <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                    Lista dei tetti salvati. Puoi rinominarli (es: "Campata A") o rimuoverli. Tocca i moduli sulla mappa per eliminare gli ostacoli.
+                  </span>
+                </span>
+              </div>
               <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar">
                 {savedRoofs.map((roof) => (
                   <div key={roof.id} className="bg-zinc-800 p-3 rounded-xl border border-zinc-700 flex items-center justify-between gap-3">
@@ -278,9 +319,19 @@ export default function PvPlanner() {
             </div>
           )}
 
-          {/* Parametri Economici */}
+          {/* Sezione 5: Preventivo Costi */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Preventivo costi impianto</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                💶 Preventivo costi impianto
+              </span>
+              <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Configura le tariffe del cantiere. Il totale investimento moltiplicherà in automatico i pannelli reali per il costo impostato.
+                </span>
+              </span>
+            </div>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -314,8 +365,19 @@ export default function PvPlanner() {
             </div>
           </div>
 
+          {/* Sezione 6: Bolletta */}
           <div className="space-y-2 border-t border-zinc-800 pt-4">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bolletta Elettrica Presunta (€/Mese)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                ⚡ Bolletta Presunta
+              </label>
+              <span className="group relative inline-block cursor-help text-zinc-500 hover:text-emerald-400">
+                ℹ️
+                <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
+                  Inserisci la spesa elettrica presunta o reale dell'azienda per calcolare il rientro in ammortamento dell'impianto.
+                </span>
+              </span>
+            </div>
             <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
           </div>
 
@@ -338,6 +400,7 @@ export default function PvPlanner() {
             panelRotation={panelRotation}
             currentPoints={currentPoints}
             savedRoofs={savedRoofs}
+            mapCenter={mapCenter} // Passaggio dello stato reattivo delle coordinate
             onMapClick={handleMapClick}
             onPanelDeleted={handlePanelDeleted}
           />
