@@ -1,6 +1,5 @@
 "use client";
 
-// CORRETTO: Importato useRef per sbloccare la build di Vercel
 import React, { useEffect, useState, useRef } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 import MapPlanner from '@/components/MapPlanner';
@@ -32,9 +31,9 @@ export default function PvPlanner() {
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
   const [panelRotation, setPanelRotation] = useState(0); 
 
-  // Configurazione dei parametri economici
-  const [costPerKwp, setCostPerKwp] = useState(1300);
-  const [fixedCosts, setFixedCosts] = useState(1500);
+  // Configurazione dei parametri economici basata sul Costo per Pannello Singolo (Modello Sipro Energy)
+  const [costPerPanel, setCostPerPanel] = useState(450); // Costo medio comprensivo di staffaggio e posa per singolo modulo
+  const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState(15);
   const [costPerKwhStorage, setCostPerKwhStorage] = useState(600);
@@ -59,6 +58,18 @@ export default function PvPlanner() {
       };
     }));
   }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
+
+  // SCORRIMENTO AUTOMATICO: Effettua uno scroll fluido verso il basso alla comparsa del preventivo
+  useEffect(() => {
+    if (isCalculated) {
+      setTimeout(() => {
+        const targetElement = document.getElementById('report-output-section');
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 350); // Attende l'animazione di montaggio del componente
+    }
+  }, [isCalculated]);
 
   const handleMapClick = (point: Coordinate) => {
     if (isCalculated) return;
@@ -133,7 +144,8 @@ export default function PvPlanner() {
     const estimPeakPower = totalActualPanels * 0.430; 
     setPeakPower(estimPeakPower);
 
-    let costTotal = (estimPeakPower * costPerKwp) + fixedCosts;
+    // Calcolo preventivo basato sul costo del SINGOLO PANNELLO reale posizionato
+    let costTotal = (totalActualPanels * costPerPanel) + fixedCosts;
     if (includeStorage) {
       costTotal += (storageCapacity * costPerKwhStorage);
     }
@@ -214,7 +226,7 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Slider di rotazione manual */}
+          {/* Slider di rotazione manuale */}
           <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
@@ -258,8 +270,9 @@ export default function PvPlanner() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Modulo + Posa (€/kWp)</label>
-                  <input type="number" value={costPerKwp} onChange={(e) => setCostPerKwp(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2.5 rounded-lg mt-1" />
+                  {/* AGGIORNATO AL COSTO PER SINGOLO PANNELLO */}
+                  <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Costo Singolo Pannello (€)</label>
+                  <input type="number" value={costPerPanel} onChange={(e) => setCostPerPanel(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2.5 rounded-lg mt-1" />
                 </div>
                 <div>
                   <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Progetto & Fissi (€)</label>
@@ -290,7 +303,7 @@ export default function PvPlanner() {
 
           <div className="space-y-2 border-t border-zinc-800 pt-4">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bolletta Elettrica Presunta (€/Mese)</label>
-            <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2.5 rounded-lg mt-1" />
+            <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
           </div>
 
           <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800">
@@ -318,17 +331,20 @@ export default function PvPlanner() {
         </div>
       </div>
 
+      {/* Identificativo di ancoraggio per l'autoscroll automatico */}
       {isCalculated && (
-        <ReportPreview 
-          tenant={tenant}
-          address={address}
-          savedRoofs={savedRoofs}
-          totalArea={totalAreaSqm}
-          initialPower={peakPower}
-          initialProduction={annualProduction}
-          initialSavings={annualSavings}
-          initialCost={estimatedCost}
-        />
+        <div id="report-output-section">
+          <ReportPreview 
+            tenant={tenant}
+            address={address}
+            savedRoofs={savedRoofs}
+            totalArea={totalAreaSqm}
+            initialPower={peakPower}
+            initialProduction={annualProduction}
+            initialSavings={annualSavings}
+            initialCost={estimatedCost}
+          />
+        </div>
       )}
     </div>
   );
