@@ -7,6 +7,7 @@ interface SavedRoof {
   name: string;
   area: number;
   panelCount: number;
+  lengths: number[]; // Riceve i lati modificati
 }
 
 interface ReportPreviewProps {
@@ -88,7 +89,7 @@ export default function ReportPreview({
       {/* --- PRIMA PAGINA DEL PREVENTIVO --- */}
       <div className="space-y-6">
         
-        {/* Intestazione Commerciale con LOGO personalizzato o fallback testuale */}
+        {/* Intestazione con Logo */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
           <div className="flex items-center space-x-4">
             {tenant?.logo_url ? (
@@ -125,6 +126,13 @@ export default function ReportPreview({
                 <span className="font-bold text-white print:text-black text-xs block">{roof.name}</span>
                 <p className="text-sm text-emerald-400 font-bold mt-1">{Math.round(roof.area)} mq</p>
                 <span className="text-[10px] text-zinc-500 block mt-0.5">Moduli posizionati: {roof.panelCount}</span>
+                
+                {/* Visualizzazione delle quotature dei lati modificati nel PDF */}
+                {roof.lengths && roof.lengths.length > 0 && (
+                  <p className="text-[9px] text-zinc-400 print:text-zinc-600 mt-2 font-mono">
+                    Lati: {roof.lengths.map(l => `${l.toFixed(1)}m`).join(' - ')}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -185,7 +193,6 @@ export default function ReportPreview({
         </div>
       </div>
 
-      {/* Firme di Convalida */}
       <div className="hidden print:flex items-center justify-between pt-16 mt-8 border-t border-zinc-200">
         <div className="text-center w-64 border-b border-zinc-400 pb-2">
           <p className="text-[10px] text-zinc-500">Timbro e Firma per Conferma (Azienda)</p>
@@ -195,7 +202,6 @@ export default function ReportPreview({
         </div>
       </div>
 
-      {/* Barra pulsanti schermo */}
       <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:hidden">
         <span className="text-xs text-zinc-500">
           *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di premere esporta per allinearli ai tuoi listini esatti.
