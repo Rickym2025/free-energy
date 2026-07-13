@@ -44,14 +44,34 @@ export default function ReportPreview({
     setEstimatedCost(initialCost);
   }, [totalArea, initialPower, initialProduction, initialSavings, initialCost]);
 
-  // Conteggio totale dei pannelli effettivamente sopravvissuti (non cancellati dall'utente)
   const totalPanels = savedRoofs.reduce((acc, r) => acc + r.panelCount, 0);
   const brandColor = tenant?.brand_color_hex || '#0284c7';
 
   return (
     <div className="bg-zinc-900 border-2 border-emerald-500/30 p-8 rounded-3xl space-y-8 print:bg-white print:text-black print:border-0 print:p-0 animate-fadeIn">
       
-      {/* Intestazione Commerciale con i dati dell'Installatore (White-Label) */}
+      {/* Iniezione CSS di stampa per forzare la rimozione di URL, titolo e data del browser */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          @page { margin: 0; }
+          body { 
+            margin: 1.5cm !important; 
+            background: white !important; 
+            color: black !important; 
+          }
+          /* Visualizza e formatta la mappa satellitare integrata nel PDF stampato */
+          #map-pv { 
+            display: block !important; 
+            height: 280px !important; 
+            width: 100% !important; 
+            border: 1px solid #ddd !important; 
+            border-radius: 12px; 
+            margin: 15px 0 !important; 
+          }
+        }
+      `}} />
+
+      {/* Intestazione Commerciale */}
       <div className="flex items-start justify-between border-b border-zinc-800 pb-6 print:border-zinc-300">
         <div className="space-y-1">
           <h2 className="text-2xl font-black text-white print:text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
@@ -66,7 +86,7 @@ export default function ReportPreview({
         </div>
       </div>
 
-      {/* Elenco dettagliato delle aree del capannone tracciate con relativo numero di pannelli */}
+      {/* Sezione esplicativa con elenco delle falde del capannone e relativi pannelli */}
       <div className="space-y-3">
         <span className="text-xs font-bold text-zinc-400 print:text-zinc-700 uppercase tracking-wider block">Specifiche delle Falde Rilevate</span>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:grid-cols-3">
@@ -80,7 +100,7 @@ export default function ReportPreview({
         </div>
       </div>
 
-      {/* Dati tecnici finali del preventivo */}
+      {/* Dati tecnici finali */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:grid-cols-4 pt-4 border-t border-zinc-800 print:border-zinc-300">
         <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-750 print:bg-zinc-100 print:border-zinc-300">
           <span className="text-[10px] text-zinc-400 print:text-zinc-600 uppercase font-bold block">Superficie Totale</span>
