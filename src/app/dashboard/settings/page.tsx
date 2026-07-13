@@ -16,6 +16,19 @@ export default function Settings() {
   const SUPABASE_URL = "https://hmpxgbzykwwqgfzifdlc.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
 
+  // Gestione del caricamento di file fisici PNG/JPG locali ed autoconversione in Base64
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      // Imposta la stringa Base64 generata nello stato per salvarla nel database
+      setLogoUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenant) return;
@@ -39,7 +52,7 @@ export default function Settings() {
         })
       });
 
-      alert("Impostazioni salvate con successo. Ricarica la pagina per applicare i colori.");
+      alert("Impostazioni salvate con successo. Ricarica la pagina per applicare le modifiche.");
       await refreshTenant();
     } catch (err) {
       console.error(err);
@@ -49,13 +62,13 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fadeIn max-w-2xl">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-white">Impostazioni Brand</h1>
         <p className="text-zinc-400 mt-1">Configura l'identità visiva della tua piattaforma.</p>
       </div>
 
-      <div className="max-w-2xl bg-zinc-900/80 border border-zinc-800 p-8 rounded-2xl">
+      <div className="bg-zinc-900/80 border border-zinc-800 p-8 rounded-2xl">
         <form onSubmit={handleSaveSettings} className="space-y-6">
           
           <div className="space-y-2">
@@ -63,15 +76,43 @@ export default function Settings() {
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" required />
           </div>
 
-          {/* AGGIUNTO IL CAMPO URL LOGO AZIENDALE */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">URL Logo Azienda</label>
-            <input type="url" placeholder="Es: https://sito.com/logo.png" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
+          {/* Sezione Caricamento Logo (File o URL) */}
+          <div className="space-y-3">
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Logo Azienda (PNG / JPG)</label>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+              {/* Uploader File Locale */}
+              <div className="border-2 border-dashed border-zinc-800 hover:border-emerald-500/40 rounded-xl p-4 text-center cursor-pointer relative bg-zinc-950/40">
+                <input 
+                  type="file" 
+                  accept="image/png, image/jpeg, image/jpg" 
+                  onChange={handleLogoFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                />
+                <span className="text-xs text-zinc-400 block font-semibold">📁 Seleziona PNG o JPG</span>
+                <span className="text-[10px] text-zinc-500 block mt-1">Carica direttamente dal tuo computer</span>
+              </div>
+
+              {/* Anteprima visiva */}
+              {logoUrl ? (
+                <div className="flex items-center space-x-3 bg-zinc-800/40 p-3 rounded-xl border border-zinc-800">
+                  <img src={logoUrl} alt="Anteprima Logo" className="h-10 w-24 object-contain rounded" />
+                  <button type="button" onClick={() => setLogoUrl('')} className="text-xs text-red-400 hover:text-red-300">Rimuovi</button>
+                </div>
+              ) : (
+                <span className="text-xs text-zinc-500 italic block">Nessun logo caricato</span>
+              )}
+            </div>
+
+            <div className="space-y-1.5 pt-2">
+              <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Oppure inserisci URL diretto del Logo</span>
+              <input type="url" placeholder="Es: https://solisenergy.it/logo.png" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none" />
+            </div>
           </div>
 
           <div className="space-y-2">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Email Notifiche Report</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" placeholder="Es: info@solisenergy.it" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
           </div>
 
           <div className="border-t border-zinc-800 pt-4 space-y-4">
