@@ -68,7 +68,6 @@ export default function PvPlanner() {
     };
   }, []);
 
-  // AGGIORNAMENTO DINAMICO: Ricalcola istantaneamente i pannelli di tutte le aree ad ogni scatto dello slider
   useEffect(() => {
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
@@ -287,7 +286,8 @@ export default function PvPlanner() {
         {/* Barra di comando */}
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
           <form onSubmit={handleSearch} className="space-y-2">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Punta il Capannone</label>
+            {/* ETICHETTA AGGIORNATA */}
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Disegna impianto</label>
             <div className="flex gap-2">
               <input type="text" placeholder="Es: Zona Industriale, Frosinone" value={address} onChange={(e) => setAddress(e.target.value)} className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none" />
               <button type="submit" className="bg-zinc-800 border border-zinc-700 px-4 rounded-xl text-white transition">🔍</button>
@@ -295,7 +295,7 @@ export default function PvPlanner() {
           </form>
 
           {/* Slider di rotazione manuale */}
-          <div className="p-4 rounded-xl border border-zinc-750 space-y-2" style={{ backgroundColor: '#27272a' }}>
+          <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
               <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
@@ -332,9 +332,9 @@ export default function PvPlanner() {
             </div>
           )}
 
-          {/* Parametri Economici */}
+          {/* Parametri Economici - ETICHETTA AGGIORNATA */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Listino Costi Industriali</span>
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Preventivo costi impianto</span>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -368,8 +368,9 @@ export default function PvPlanner() {
             </div>
           </div>
 
+          {/* ETICHETTA AGGIORNATA */}
           <div className="space-y-2 border-t border-zinc-800 pt-4">
-            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bolletta Elettrica (€/Mese)</label>
+            <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Bolletta Elettrica Presunta (€/Mese)</label>
             <input type="number" value={monthlyBill} onChange={(e) => setMonthlyBill(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" />
           </div>
 
