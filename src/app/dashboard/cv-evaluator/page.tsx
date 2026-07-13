@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useTenant } from '@/app/context/TenantContext';
+import { useTenant } from '../../context/TenantContext';
 
 interface Candidate {
   id: string;
@@ -214,6 +214,68 @@ export default function CvEvaluator() {
     }
   };
 
+  /**
+   * Aggiorna lo stato di valutazione di un candidato su Supabase ed aggiorna lo stato locale.
+   */
+  const handleUpdateStatus = async (candidateId: string, newStatus: string) => {
+    try {
+      // Se si tratta di un record mockato del paracadute locale, aggiorna solo lo stato in memoria
+      if (candidateId.startsWith('local-')) {
+        setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: newStatus } : c));
+        setSelectedCandidate(prev => prev && prev.id === candidateId ? { ...prev, status: newStatus } : prev);
+        return;
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/cv_candidates?id=eq.${candidateId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        setCandidates(prev => prev.map(c => c.id === candidateId ? { ...c, status: newStatus } : c));
+        setSelectedCandidate(prev => prev && prev.id === candidateId ? { ...prev, status: newStatus } : prev);
+      } else {
+        console.error("Errore risposta aggiornamento stato");
+      }
+    } catch (err) {
+      console.error("Errore di rete durante aggiornamento stato:", err);
+    }
+  };
+
+  /**
+   * Converte in modo sicuro e normalizzato l'oggetto JSON dell'analisi,
+   * prevenendo i crash del parser in caso di stringhe grezze o chiavi non corrispondenti.
+   */
+  const getAnalysisData = (candidate: Candidate) => {
+    let data = candidate.ai_analysis_json as any;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) {
+        console.error("Errore di decodifica ai_analysis_json:", e);
+        return {
+          strengths: [],
+          weaknesses: [],
+          certifications: [],
+          location_proximity: "Non specificata",
+          job_match_justification: "Impossibile elaborare l'analisi dell'AI."
+        };
+      }
+    }
+    return {
+      strengths: data?.strengths || [],
+      weaknesses: data?.weaknesses || [],
+      certifications: data?.certifications || data?.certificazioni_rilevate || [],
+      location_proximity: data?.location_proximity || "Non specificata",
+      job_match_justification: data?.job_match_justification || data?.giustificazione || "Nessun report generato."
+    };
+  };
+
   const renderStars = (score: number) => {
     const starCount = Math.max(1, Math.min(5, Math.ceil(score / 20)));
     return (
@@ -221,6 +283,24 @@ export default function CvEvaluator() {
         {"★".repeat(starCount)}{"☆".repeat(5 - starCount)}
       </div>
     );
+  };
+
+  // Funzione helper per mappare graficamente lo stato del candidato
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'approvato':
+        return 'bg-emerald-950/80 text-emerald-400 border-emerald-800/80';
+      case 'rifiutato':
+        return 'bg-rose-950/80 text-rose-400 border-rose-800/80';
+      case 'colloquio':
+        return 'bg-cyan-950/80 text-cyan-400 border-cyan-800/80';
+      default:
+        return 'bg-zinc-950 text-zinc-400 border-zinc-800';
+    }
+  };
+
+  const formatStatusText = (status: string) => {
+    return status.replace(/_/g, ' ').toUpperCase();
   };
 
   return (
@@ -284,7 +364,7 @@ export default function CvEvaluator() {
           </span>
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 2: Seleziona e analizza il candidato
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-550 hover:text-emerald-400 text-xs">
+            <span className="group relative ml-2 inline-block cursor-help text-zinc-555 hover:text-emerald-400 text-xs">
               ℹ️
               <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal leading-relaxed">
                 Carica il file del CV dell'operaio in PDF. L'AI lo confronterà con l'annuncio sopra configurato. (Costo: 50 crediti).
@@ -369,23 +449,42 @@ export default function CvEvaluator() {
 
           <div className="p-5 bg-zinc-950 rounded-xl border border-zinc-800 text-sm text-zinc-300 leading-relaxed space-y-2">
             <span className="text-xs text-zinc-500 block uppercase font-mono tracking-wider">Report di Compatibilità AI:</span>
-            <p>{selectedCandidate.ai_analysis_json.job_match_justification}</p>
+            <p>{getAnalysisData(selectedCandidate).job_match_justification}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             <div>
               <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Competenze Rilevate</span>
               <div className="flex gap-2 flex-wrap mt-2">
-                {selectedCandidate.ai_analysis_json.certifications.map((cert, i) => (
+                {getAnalysisData(selectedCandidate).certifications.map((cert: string, i: number) => (
                   <span key={i} className="px-3 py-1 bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 rounded-lg">
                     ✓ {cert}
                   </span>
                 ))}
               </div>
             </div>
-            <div>
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Residenza e Logistica</span>
-              <p className="text-sm text-zinc-300 mt-2 leading-relaxed font-semibold">📍 {selectedCandidate.ai_analysis_json.location_proximity}</p>
+            
+            <div className="space-y-4">
+              <div>
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Residenza e Logistica</span>
+                <p className="text-sm text-zinc-300 mt-2 leading-relaxed font-semibold">📍 {getAnalysisData(selectedCandidate).location_proximity}</p>
+              </div>
+
+              {/* Selettore Stato Candidato in tempo reale */}
+              <div>
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">Stato della Valutazione</span>
+                <select 
+                  value={selectedCandidate.status}
+                  onChange={(e) => handleUpdateStatus(selectedCandidate.id, e.target.value)}
+                  className="bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="da_valutare">Da Valutare</option>
+                  <option value="colloquio">In Colloquio</option>
+                  <option value="approvato">Approvato</option>
+                  <option value="rifiutato">Rifiutato</option>
+                </option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -410,7 +509,9 @@ export default function CvEvaluator() {
                   <p className="text-xs text-emerald-400 mt-1">Confrontato con: {c.applied_role}</p>
                 </div>
                 <div className="flex items-center space-x-6">
-                  <span className="text-xs bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-zinc-450">{c.status}</span>
+                  <span className={`text-[10px] px-2.5 py-1 rounded-md border font-bold font-mono tracking-wider ${getStatusBadgeClass(c.status)}`}>
+                    {formatStatusText(c.status)}
+                  </span>
                   {renderStars(c.score)}
                 </div>
               </div>
