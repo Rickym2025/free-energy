@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 import MapPlanner from '@/components/MapPlanner';
 import ReportPreview from '@/components/ReportPreview';
@@ -31,8 +31,8 @@ export default function PvPlanner() {
   const [currentPoints, setCurrentPoints] = useState<Coordinate[]>([]);
   const [panelRotation, setPanelRotation] = useState(0); 
 
-  // Configurazione dei parametri economici basata sul Costo per Pannello Singolo (Modello Sipro Energy)
-  const [costPerPanel, setCostPerPanel] = useState(450); // Costo medio comprensivo di staffaggio e posa per singolo modulo
+  // Configurazione dei parametri economici
+  const [costPerPanel, setCostPerPanel] = useState(450); 
   const [fixedCosts, setFixedCosts] = useState(1500); 
   const [includeStorage, setIncludeStorage] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState(15);
@@ -59,7 +59,6 @@ export default function PvPlanner() {
     }));
   }, [panelRotation, tenant?.panel_width_m, tenant?.panel_height_m]);
 
-  // SCORRIMENTO AUTOMATICO: Effettua uno scroll fluido verso il basso alla comparsa del preventivo
   useEffect(() => {
     if (isCalculated) {
       setTimeout(() => {
@@ -67,7 +66,7 @@ export default function PvPlanner() {
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }, 350); // Attende l'animazione di montaggio del componente
+      }, 350); 
     }
   }, [isCalculated]);
 
@@ -144,7 +143,6 @@ export default function PvPlanner() {
     const estimPeakPower = totalActualPanels * 0.430; 
     setPeakPower(estimPeakPower);
 
-    // Calcolo preventivo basato sul costo del SINGOLO PANNELLO reale posizionato
     let costTotal = (totalActualPanels * costPerPanel) + fixedCosts;
     if (includeStorage) {
       costTotal += (storageCapacity * costPerKwhStorage);
@@ -207,17 +205,37 @@ export default function PvPlanner() {
     }
   };
 
+  const handleMapClick = (point: Coordinate) => {
+    if (isCalculated) return;
+    setCurrentPoints(prev => [...prev, point]);
+  };
+
   return (
     <div className="space-y-8">
+      {/* Intestazione Commerciale visibile solo nel PDF stampato in prima pagina */}
+      <div className="hidden print:flex print:items-start print:justify-between print:border-b print:border-zinc-300 print:pb-6 print:mb-6">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-black text-black uppercase tracking-tight">{tenant?.company_name || 'Solis Energy SRL'}</h2>
+          <p className="text-xs text-zinc-600 font-medium">Offerta economica per impianto fotovoltaico connesso in rete con formula "chiavi in mano"</p>
+          {address && <p className="text-xs text-zinc-500 font-semibold mt-1">📍 Edificio / Capannone sito in: {address}</p>}
+        </div>
+        
+        <div className="text-right text-xs text-zinc-700 space-y-1">
+          <span className="font-bold text-black text-sm block">Riferimenti Commerciali</span>
+          <p>Email: {tenant?.notification_email || 'tecnico@novasolar.it'}</p>
+          <p>Data Offerta: {new Date().toLocaleDateString()}</p>
+        </div>
+      </div>
+
       <div className="print:hidden">
         <h1 className="text-3xl font-bold tracking-tight text-white">PV Planner Industriale</h1>
         <p className="text-zinc-400 mt-1">Traccia le falde dei capannoni. Regola l'angolo di rotazione e clicca su un pannello per rimuoverlo.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:block">
         
         {/* Barra di comando */}
-        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6">
+        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6 print:hidden">
           <form onSubmit={handleSearch} className="space-y-2">
             <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Disegna impianto</label>
             <div className="flex gap-2">
@@ -226,14 +244,14 @@ export default function PvPlanner() {
             </div>
           </form>
 
-          {/* Slider di rotazione manuale */}
+          {/* Slider di rotazione */}
           <div className="p-4 rounded-xl border border-zinc-700 space-y-2" style={{ backgroundColor: '#27272a' }}>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white">Rotazione Pannelli CAD</span>
+              <span className="text-xs font-bold text-white">Rotazione Pannelli</span>
               <span className="text-xs text-emerald-400 font-bold">{panelRotation}°</span>
             </div>
             <input type="range" min="0" max="360" value={panelRotation} onChange={(e) => setPanelRotation(parseInt(e.target.value))} className="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-            <span className="text-[10px] text-zinc-500 block">Trascina per allineare perfettamente i pannelli alla grondaia.</span>
+            <span className="text-[10px] text-zinc-500 block">Allinea perfettamente i pannelli alla grondaia.</span>
           </div>
 
           {currentPoints.length > 0 && (
@@ -264,13 +282,11 @@ export default function PvPlanner() {
             </div>
           )}
 
-          {/* Parametri Economici */}
           <div className="border-t border-zinc-800 pt-4 space-y-4">
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Preventivo costi impianto</span>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  {/* AGGIORNATO AL COSTO PER SINGOLO PANNELLO */}
                   <label className="text-[10px] text-zinc-500 font-semibold block uppercase">Costo Singolo Pannello (€)</label>
                   <input type="number" value={costPerPanel} onChange={(e) => setCostPerPanel(parseInt(e.target.value) || 0)} className="w-full bg-zinc-800 border border-zinc-700 text-xs text-white p-2.5 rounded-lg mt-1" />
                 </div>
@@ -316,8 +332,8 @@ export default function PvPlanner() {
           </div>
         </div>
 
-        {/* Contenitore Mappa */}
-        <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative">
+        {/* Contenitore Mappa: Mantenuto visibile in stampa con dimensioni ottimizzate */}
+        <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative print:block print:h-[350px] print:w-full print:mb-8 print:border print:border-zinc-300 print:rounded-2xl">
           <MapPlanner 
             brandColor={brandColor}
             panelWidth={tenant?.panel_width_m || 1.65}
@@ -331,7 +347,6 @@ export default function PvPlanner() {
         </div>
       </div>
 
-      {/* Identificativo di ancoraggio per l'autoscroll automatico */}
       {isCalculated && (
         <div id="report-output-section">
           <ReportPreview 
