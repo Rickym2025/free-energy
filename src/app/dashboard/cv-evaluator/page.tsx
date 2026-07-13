@@ -482,7 +482,6 @@ export default function CvEvaluator() {
                   <option value="colloquio">In Colloquio</option>
                   <option value="approvato">Approvato</option>
                   <option value="rifiutato">Rifiutato</option>
-                </option>
                 </select>
               </div>
             </div>
