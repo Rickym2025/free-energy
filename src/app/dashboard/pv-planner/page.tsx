@@ -17,7 +17,7 @@ interface SavedRoof {
   points: Coordinate[];
   area: number;
   panelCount: number;
-  lengths: number[]; // Memorizza le lunghezze dei lati
+  lengths: number[];
 }
 
 export default function PvPlanner() {
@@ -75,6 +75,11 @@ export default function PvPlanner() {
     setCurrentPoints(prev => [...prev, point]);
   };
 
+  // Aggiorna lo stato dei punti quando un pin viene trascinato sulla mappa satellitare
+  const handleMarkerDrag = (index: number, newCoord: Coordinate) => {
+    setCurrentPoints(prev => prev.map((p, idx) => idx === index ? newCoord : p));
+  };
+
   const handleUndoLastPoint = () => {
     setCurrentPoints(prev => prev.slice(0, -1));
   };
@@ -96,7 +101,6 @@ export default function PvPlanner() {
     const pHeight = tenant?.panel_height_m || 1.0;
     const panelCount = calculatePanelCount(currentPoints, pWidth, pHeight, panelRotation);
 
-    // Calcola e memorizza le lunghezze reali dei lati (in metri)
     const lengths: number[] = [];
     for (let i = 0; i < currentPoints.length; i++) {
       const p1 = currentPoints[i];
@@ -129,13 +133,21 @@ export default function PvPlanner() {
     setSavedRoofs(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
   };
 
-  // Funzione per aggiornare manualmente la lunghezza dei lati dall'input dell'utente
+  // AGGIORNATO: Proporzionalità geometrica che allinea mq e numero di moduli modificando i lati
   const handleUpdateLength = (id: string, index: number, newVal: number) => {
     setSavedRoofs(prev => prev.map(r => {
       if (r.id === id) {
+        const oldVal = r.lengths[index] || 1;
+        const ratio = newVal / oldVal; // Fattore di scala proporzionale
         const nextLengths = [...r.lengths];
         nextLengths[index] = newVal;
-        return { ...r, lengths: nextLengths };
+
+        return {
+          ...r,
+          lengths: nextLengths,
+          area: Math.max(1, r.area * ratio),
+          panelCount: Math.max(0, Math.round(r.panelCount * ratio)) // Ricalcola i moduli attivi
+        };
       }
       return r;
     }));
@@ -261,6 +273,7 @@ export default function PvPlanner() {
             mapCenter={mapCenter}
             onMapClick={handleMapClick}
             onPanelDeleted={handlePanelDeleted}
+            onMarkerDrag={handleMarkerDrag} // Passaggio del callback per i pin trascinabili
           />
         </div>
       </div>
@@ -283,6 +296,7 @@ export default function PvPlanner() {
   );
 }
 
+// Spostati all'esterno del componente per risolvere l'hoisting
 function calculateAreaInSqm(points: Coordinate[]) {
   if (points.length < 3) return 0;
   const latMid = points[0].lat * Math.PI / 180;
@@ -295,7 +309,6 @@ function calculateAreaInSqm(points: Coordinate[]) {
   return Math.abs(area / 2);
 }
 
-// Funzione geometrica di supporto per calcolare la distanza geodetica reale (in metri) tra due vertici
 function calculateDistanceMeters(p1: Coordinate, p2: Coordinate): number {
   const rad = Math.PI / 180;
   const latMid = p1.lat * rad;
