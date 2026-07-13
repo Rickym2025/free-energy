@@ -14,6 +14,7 @@ interface MapPlannerProps {
   panelRotation: number;
   currentPoints: Coordinate[];
   savedRoofs: any[];
+  mapCenter: Coordinate | null; // Aggiunto per riposizionamento reattivo
   onMapClick: (point: Coordinate) => void;
   onPanelDeleted: (roofId: string) => void;
 }
@@ -25,6 +26,7 @@ export default function MapPlanner({
   panelRotation,
   currentPoints,
   savedRoofs,
+  mapCenter,
   onMapClick,
   onPanelDeleted
 }: MapPlannerProps) {
@@ -35,7 +37,6 @@ export default function MapPlanner({
   const savedRoofsLayerGroupRef = useRef<any>(null);
   const panelsLayerGroupRef = useRef<any>(null);
 
-  // Stato per allineamento reattivo anti-gara critica
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
@@ -71,7 +72,13 @@ export default function MapPlanner({
     };
   }, []);
 
-  // AGGIORNAMENTO DINAMICO: Ridisegna solo se la mappa è interamente pronta (mapReady)
+  // Riposiziona reattivamente la telecamera satellitare quando cambia l'indirizzo cercato
+  useEffect(() => {
+    if (mapRef.current && mapReady && mapCenter) {
+      mapRef.current.setView([mapCenter.lat, mapCenter.lng], 19);
+    }
+  }, [mapCenter, mapReady]);
+
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -136,7 +143,6 @@ export default function MapPlanner({
     savedRoofsLayerGroupRef.current = L.layerGroup().addTo(map);
     panelsLayerGroupRef.current = L.layerGroup().addTo(map);
 
-    // Dichiara la mappa pronta
     setMapReady(true);
 
     map.on('click', (e: any) => {
