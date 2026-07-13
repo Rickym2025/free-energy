@@ -40,8 +40,6 @@ export default function MapPlanner({
   const panelsLayerGroupRef = useRef<any>(null);
 
   const [mapReady, setMapReady] = useState(false);
-  const [osm3dActive, setOsm3dActive] = useState(false); 
-  const osm3dLayerInstanceRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -60,13 +58,13 @@ export default function MapPlanner({
 
     const L = (window as any).L;
     if (L) {
-      loadOsmBuildingsScript();
+      initializeMap();
     } else {
       const script = document.createElement('script');
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.async = true;
       script.onload = () => {
-        loadOsmBuildingsScript();
+        initializeMap();
       };
       document.body.appendChild(script);
     }
@@ -76,21 +74,7 @@ export default function MapPlanner({
     };
   }, []);
 
-  const loadOsmBuildingsScript = () => {
-    const OSMBuildings = (window as any).OSMBuildings;
-    if (OSMBuildings) {
-      initializeMap();
-    } else {
-      const script3d = document.createElement('script');
-      script3d.src = 'https://cdn.osmbuildings.org/classic/0.2.2b/OSMBuildings-Leaflet.js';
-      script3d.async = true;
-      script3d.onload = () => {
-        initializeMap();
-      };
-      document.body.appendChild(script3d);
-    }
-  };
-
+  // Aggiorna reattivamente tetti, moduli e quote metriche allineate
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -109,6 +93,7 @@ export default function MapPlanner({
     });
   }, [panelRotation, savedRoofs, mapReady]);
 
+  // Gestione dinamica dei segnaposto e del poligono in disegno corrente
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -182,31 +167,6 @@ export default function MapPlanner({
     map.on('click', (e: any) => {
       onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
     });
-  };
-
-  const handleToggle3D = () => {
-    const L = (window as any).L;
-    const OSMBuildings = (window as any).OSMBuildings;
-    if (!L || !OSMBuildings || !mapRef.current) return;
-
-    const nextState = !osm3dActive;
-    setOsm3dActive(nextState);
-
-    if (nextState) {
-      // 1. Carica lo strato tridimensionale ed estruggi i volumi in trasparenza a 35 gradi
-      osm3dLayerInstanceRef.current = new OSMBuildings(mapRef.current).load('https://a.data.osmbuildings.org/0.2/59fcc2e8/tile/{z}/{x}/{y}.json');
-      
-      // CORRETTO: Applica il tilt angolare di 35 gradi per dare l'effettiva prospettiva volumetrica tridimensionale
-      if (osm3dLayerInstanceRef.current && typeof osm3dLayerInstanceRef.current.tilt === 'function') {
-        osm3dLayerInstanceRef.current.tilt(35);
-      }
-    } else {
-      // CORRETTO: Sfrutta il metodo nativo di rimozione layer di Leaflet per cancellare i palazzi a scomparsa all'istante
-      if (osm3dLayerInstanceRef.current) {
-        mapRef.current.removeLayer(osm3dLayerInstanceRef.current);
-        osm3dLayerInstanceRef.current = null;
-      }
-    }
   };
 
   const drawSegmentLengths = (points: Coordinate[], targetLayer: any, isTemporary = false, lengthsOverride?: number[]) => {
@@ -312,18 +272,7 @@ export default function MapPlanner({
     }
   };
 
-  return (
-    <div className="w-full h-full relative">
-      <div id="map-pv" className="w-full h-full z-10" />
-      
-      <button 
-        onClick={handleToggle3D}
-        className="absolute top-4 right-4 z-20 bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white font-extrabold text-[10px] px-3.5 py-2.5 rounded-xl uppercase tracking-wider shadow-2xl transition"
-      >
-        {osm3dActive ? "🌐 Nascondi 3D OSM" : "🌐 Attiva 3D OSM"}
-      </button>
-    </div>
-  );
+  return <div id="map-pv" className="w-full h-full z-10" />;
 }
 
 function isPointInPolygonLocal(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
