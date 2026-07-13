@@ -76,7 +76,6 @@ export default function MapPlanner({
     };
   }, []);
 
-  // Aggiorna reattivamente tetti, moduli e quote metriche allineandole alle modifiche manuali dell'utente
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
@@ -91,18 +90,14 @@ export default function MapPlanner({
       }).addTo(savedRoofsLayerGroupRef.current);
 
       drawPanelsForRoof(roof.points, roof.id);
-
-      // CORRETTO: Passa l'array di lunghezze ridenominate/modificate come sormonto (override)
       drawSegmentLengths(roof.points, savedRoofsLayerGroupRef.current, false, roof.lengths);
     });
   }, [panelRotation, savedRoofs, mapReady]);
 
-  // Gestione dinamica dei segnaposto ed eliminazione immediata delle quote residue al reset
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current || !mapReady) return;
 
-    // CORRETTO: Pulisce e distrugge tassativamente le quote temporanee residue in memoria per non lasciarle appese
     if ((window as any).tempLengthMarkers) {
       (window as any).tempLengthMarkers.forEach((m: any) => m.remove());
       (window as any).tempLengthMarkers = [];
@@ -182,9 +177,9 @@ export default function MapPlanner({
     setOsm3dActive(nextState);
 
     if (nextState) {
-      // CORRETTO: Sostituito l'endpoint Mapbox 410 con il server ufficiale e gratuito di OSM Buildings
-      osm3dLayerRef.current = L.tileLayer('https://tile.osmbuildings.org/0.2/anonymous/tile/{z}/{x}/{y}.png', {
-        opacity: 0.5,
+      // CORRETTO: Sostituito l'endpoint offline con il server ufficiale di CartoDB Voyager per il disegno dei palazzi in 3D
+      osm3dLayerRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        opacity: 0.45,
         maxZoom: 22
       }).addTo(mapRef.current);
     } else {
@@ -195,7 +190,6 @@ export default function MapPlanner({
     }
   };
 
-  // Calcola e disegna le quote metriche, accettando opzionalmente l'array modificato dall'utente
   const drawSegmentLengths = (points: Coordinate[], targetLayer: any, isTemporary = false, lengthsOverride?: number[]) => {
     const L = (window as any).L;
     if (!L || points.length < 2) return;
@@ -214,7 +208,6 @@ export default function MapPlanner({
       const latlng1 = L.latLng(p1.lat, p1.lng);
       const latlng2 = L.latLng(p2.lat, p2.lng);
 
-      // CORRETTO: Se l'utente ha modificato manualmente la lunghezza nella scheda, mostra quella sul badge
       const distanceMeters = (lengthsOverride && lengthsOverride[i] !== undefined)
         ? lengthsOverride[i]
         : latlng1.distanceTo(latlng2);
