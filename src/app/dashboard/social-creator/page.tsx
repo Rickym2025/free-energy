@@ -49,7 +49,6 @@ export default function SocialCreator() {
 
       if (response.ok) {
         const data = await response.json();
-        // Carica le slide Base64 ed il copy generati in tempo reale da n8n
         if (data && data.slides) {
           setGeneratedSlides(data.slides);
           setSocialCopy(data.social_copy || null);
@@ -60,16 +59,15 @@ export default function SocialCreator() {
       throw new Error("Avvio Fallback Mockup");
     } catch (err) {
       setTimeout(() => {
-        // Fallback grafico pre-compilato di test se n8n è offline
         setGeneratedSlides([
           "https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=600&q=80",
           "https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?auto=format&fit=crop&w=600&q=80",
           "https://images.unsplash.com/photo-1620052581237-5d36667be337?auto=format&fit=crop&w=600&q=80"
         ]);
         setSocialCopy({
-          instagram: `🌞 Riduci i costi energetici a ${targetLocation}! Con il nostro impianto fotovoltaico personalizzato da 6 kWp con accumulo da 10kWh, risparmi subito sulle bollette. \n\nBenefici inclusi:\n✓ Taglio dei costi in bolletta\n✓ Detrazione fiscale al 50%\n\nCommenta "energia" per ricevere la nostra guida completa all'installazione! #fotovoltaico #energia #polesine`,
+          instagram: `🌞 Riduci i costi energetici a ${targetLocation}! Con il nostro impianto fotovoltaico personalizzato da 6 kWp con accumulo da 10kWh, risparmi subito sulle bollette. \n\nBenefici inclusi:\n✓ Taglio dei costi in bolletta\n✓ Detrazione fiscale al 50%\n\nCommenta "energia" per ricevere la nostra guida completa all'installazione! #fotovoltaico #energia`,
           facebook: `Costi elettrici alle stelle? Con Sipro Energy e il nostro impianto fotovoltaico su misura per le aziende di ${targetLocation}, puoi finalmente azzerare gli sprechi energetici del tuo capannone!\n\n💡 Dettagli offerta:\n- Potenza: 6 kWp\n- Accumulo integrato: 10 kWh\n- Detrazione fiscale: 50% di rimborso\n\nCommenta "energia" per ricevere un'analisi di cantiere gratuita!`,
-          tiktok: `Risparmia sulla bolletta! Scopri come il nostro impianto fotovoltaico da 6 kWp a ${targetLocation} ti aiuta ad azzerare i costi energetici. Commenta "energia" per la guida all'installazione! 🔋☀️ #fotovoltaico #solare #risparmio`
+          tiktok: `Risparmia sulla bolletta! Scopri come il nostro impianto fotovoltaico da 6 kWp a ${targetLocation} ti aiuta ad azzerare i costi energetici. Commenta "energia" per la guida all'installazione! 🔋☀️ #fotovoltaico #risparmio`
         });
         setIsGenerating(false);
       }, 2000);
@@ -88,7 +86,7 @@ export default function SocialCreator() {
   const brandColor = tenant?.brand_color_hex || '#0284c7';
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+    <div className="max-w-7xl mx-auto px-4 space-y-8 pb-16">
       
       {/* INTESTAZIONE */}
       <div>
@@ -98,18 +96,12 @@ export default function SocialCreator() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* PANNELLO INPUT (FASE 1) */}
-        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl h-fit space-y-6 shadow-xl">
+        {/* PANNELLO INPUT (4 COLONNE) */}
+        <div className="lg:col-span-4 bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-6 shadow-xl">
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 1: Configura la campagna
-            <span className="group relative ml-2 inline-block cursor-help text-zinc-500 hover:text-emerald-400 text-xs">
-              ℹ️
-              <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-48 rounded-lg bg-zinc-950 border border-zinc-850 p-3 text-center text-xs text-zinc-200 shadow-2xl invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 whitespace-normal font-normal">
-                Imposta la località ed i dettagli dell'offerta solare per generare la grafica pre-brandizzata. (Costo: 100 crediti).
-              </span>
-            </span>
           </h2>
           
           <form onSubmit={handleGenerateSocialKit} className="space-y-4">
@@ -171,8 +163,8 @@ export default function SocialCreator() {
           </form>
         </div>
 
-        {/* VISUALIZZATORE ANTEPRIMA (FASE 2) */}
-        <div className="lg:col-span-2 flex flex-col min-h-[500px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-xl">
+        {/* VISUALIZZATORE ANTEPRIMA LARGO (8 COLONNE) */}
+        <div className="lg:col-span-8 flex flex-col min-h-[600px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-xl">
           <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">Anteprima Carosello 4:5</h2>
             {generatedSlides.length > 0 && (
@@ -187,12 +179,12 @@ export default function SocialCreator() {
           
           <div className="flex-1 p-8 flex flex-col items-center justify-center">
             {isGenerating ? (
-              <div className="flex flex-col items-center space-y-4 text-center max-w-xs">
+              <div className="flex flex-col items-center space-y-4 text-center max-w-sm">
                 <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm text-zinc-400">Sto disegnando le tue slide fotografiche in formato 4:5 con il tuo brand...</p>
+                <p className="text-sm text-zinc-400">Generazione in corso delle 5 slide fotografiche con il tuo brand...</p>
               </div>
             ) : generatedSlides.length > 0 ? (
-              <div className="flex flex-col items-center space-y-6 w-full max-w-[340px]">
+              <div className="flex flex-col items-center space-y-6 w-full max-w-[420px]">
                 {/* Visualizzatore Slide 4:5 (Aspect Verticale) */}
                 <div className="aspect-[4/5] w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl">
                   <img 
@@ -234,7 +226,7 @@ export default function SocialCreator() {
 
       </div>
 
-      {/* DIDASCALIE SOCIAL GENERATE (FASE 3) */}
+      {/* DIDASCALIE SOCIAL GENERATE (LARGHEZZA INTERA IN BASSO) */}
       {socialCopy && (
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4 shadow-xl animate-fadeIn">
           <h3 className="text-lg font-bold text-white">Didascalie e Hashtag per i tuoi Canali</h3>
@@ -244,7 +236,7 @@ export default function SocialCreator() {
             {socialCopy.instagram && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram</span>
-                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.instagram}
                 </p>
               </div>
@@ -254,7 +246,7 @@ export default function SocialCreator() {
             {socialCopy.facebook && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">👥 Facebook</span>
-                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.facebook}
                 </p>
               </div>
@@ -264,7 +256,7 @@ export default function SocialCreator() {
             {socialCopy.tiktok && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">🎵 TikTok</span>
-                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.tiktok}
                 </p>
               </div>
