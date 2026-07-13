@@ -7,6 +7,7 @@ export default function DentisServicePage() {
   const { tenant, activateService } = useTenant();
   const [activating, setActivating] = useState(false);
   const [calendarId, setCalendarId] = useState('');
+  const [activeStep, setActiveStep] = useState<number | null>(null);
 
   const costCredits = 2000;
 
@@ -19,11 +20,29 @@ export default function DentisServicePage() {
     setActivating(false);
   };
 
+  const steps = [
+    {
+      title: "1. Apri Google Calendar",
+      desc: "Accedi al tuo account Google Calendar dal computer aziendale."
+    },
+    {
+      title: "2. Seleziona l'Agenda",
+      desc: "Fai clic sui tre puntini accanto al calendario che usi per i sopralluoghi dei tuoi tecnici e seleziona 'Impostazioni e condivisione'."
+    },
+    {
+      title: "3. Trova l'ID Calendario",
+      desc: "Scorri verso il basso fino alla sezione 'Integra calendario' e copia il testo del campo 'ID calendario' (può essere la tua email o una stringa simile a xxxxxxx@group.calendar.google.com)."
+    },
+    {
+      title: "4. Condividi l'Accesso",
+      desc: "Nella stessa schermata, aggiungi l'email della nostra AI alle autorizzazioni con i permessi di scrittura per consentirle di fissare i sopralluoghi."
+    }
+  ];
+
   if (!tenant?.dentis_active) {
     return (
       <div className="max-w-5xl mx-auto space-y-12 py-8 animate-fadeIn">
         
-        {/* Hero Section con Effetto Glow */}
         <div className="text-center space-y-4 relative">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
           
@@ -39,10 +58,8 @@ export default function DentisServicePage() {
           </p>
         </div>
 
-        {/* Video Mockup ed Elementi di Conversione */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
           
-          {/* Colonna Sinistra: Video Mockup Placeholder */}
           <div className="lg:col-span-3 bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden aspect-video flex flex-col justify-center items-center relative group shadow-[0_0_30px_rgba(16,185,129,0.05)]">
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 to-transparent opacity-80 z-10"></div>
             <div className="w-16 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-2xl flex items-center justify-center cursor-pointer transition z-20 shadow-lg shadow-emerald-500/20">
@@ -51,7 +68,6 @@ export default function DentisServicePage() {
             <span className="text-xs font-bold text-zinc-400 mt-4 uppercase tracking-widest z-20">Ascolta come risponde Serena AI [Video]</span>
           </div>
 
-          {/* Colonna Destra: Valore e Prezzo */}
           <div className="lg:col-span-2 space-y-6">
             <h3 className="text-xl font-bold text-white">Perché digitalizzare il centralino:</h3>
             
@@ -101,17 +117,42 @@ export default function DentisServicePage() {
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl space-y-6">
-        <h2 className="text-xl font-bold text-white">Collegamento Agenda</h2>
-        <div className="space-y-2">
-          <label className="text-xs text-zinc-400 font-semibold uppercase">ID Google Calendar</label>
+        <h2 className="text-xl font-bold text-white">Collegamento Agenda Sopralluoghi</h2>
+        
+        {/* Accordion Istruzioni Passo-Passo */}
+        <div className="space-y-3">
+          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Guida al recupero dell'ID Calendario</span>
+          <div className="space-y-2">
+            {steps.map((step, i) => (
+              <div key={i} className="bg-zinc-800/50 border border-zinc-750 rounded-xl overflow-hidden">
+                <button 
+                  onClick={() => setActiveStep(activeStep === i ? null : i)}
+                  className="w-full text-left p-4 font-semibold text-xs text-zinc-200 flex justify-between items-center hover:bg-zinc-800 transition"
+                >
+                  <span>{step.title}</span>
+                  <span className="text-zinc-500">{activeStep === i ? "−" : "+"}</span>
+                </button>
+                {activeStep === i && (
+                  <div className="p-4 pt-0 text-zinc-400 text-xs leading-relaxed border-t border-zinc-800/40">
+                    {step.desc}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2 pt-4 border-t border-zinc-800">
+          <label className="text-xs text-zinc-400 font-semibold uppercase">Inserisci ID Google Calendar Rilevato</label>
           <input 
             type="text" 
-            placeholder="Es: ufficio_tecnico@gmail.com" 
+            placeholder="Es: ufficio_tecnico@gmail.com oppure stringa @group.calendar.google.com" 
             value={calendarId}
             onChange={(e) => setCalendarId(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" 
+            className="w-full bg-zinc-850 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none" 
           />
         </div>
+        
         <button className="px-6 py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl text-xs transition">
           💾 Salva e Sincronizza Calendario
         </button>
