@@ -2,20 +2,14 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// Funzioni di sanificazione per evitare errori di copiatura (spazi, virgolette, slash finali)
-const sanitizeUrl = (url: string) => {
-  return url.replace(/^["']|["']$/g, '').trim().replace(/\/$/, '');
+// Funzione di inizializzazione ultra-sicura per prevenire stringhe "undefined" o vuote
+const getEnvVar = (value: string | undefined, fallback: string): string => {
+  if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
+  return value.replace(/^["']|["']$/g, '').trim();
 };
 
-const sanitizeKey = (key: string) => {
-  return key.replace(/^["']|["']$/g, '').trim();
-};
-
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://hmpxgbzykwwqgfzifdlc.supabase.co";
-const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw";
-
-const SUPABASE_URL = sanitizeUrl(rawUrl);
-const SUPABASE_ANON_KEY = sanitizeKey(rawKey);
+const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
+const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
 
 export interface Tenant {
   id: string;
@@ -97,7 +91,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       console.warn("Utilizzo cache locale:", err.message);
       const localCached = localStorage.getItem('fe_tenant_data');
-      if (localCached) {
+      if (localCached && localCached !== "undefined" && localCached !== "null") {
         try { setTenant(JSON.parse(localCached)); } catch (_) {}
       } else {
         setTenant({
@@ -140,7 +134,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
-          'Prefer': 'return=representation' // Forza Supabase a restituire la riga appena creata
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify(demoPayload)
       });
@@ -168,7 +162,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setTenantIdState(savedId);
 
     const localCached = localStorage.getItem('fe_tenant_data');
-    if (localCached) {
+    if (localCached && localCached !== "undefined" && localCached !== "null") {
       try { setTenant(JSON.parse(localCached)); } catch (_) {}
     }
     fetchTenantData(savedId);
