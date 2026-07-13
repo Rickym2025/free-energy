@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface Coordinate {
   lat: number;
@@ -35,6 +35,9 @@ export default function MapPlanner({
   const savedRoofsLayerGroupRef = useRef<any>(null);
   const panelsLayerGroupRef = useRef<any>(null);
 
+  // Stato per allineamento reattivo anti-gara critica
+  const [mapReady, setMapReady] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -50,7 +53,6 @@ export default function MapPlanner({
     `;
     document.head.appendChild(styleEl);
 
-    // Inizializzazione sicura con rimozione istanze precedenti
     const L = (window as any).L;
     if (L) {
       initializeMap();
@@ -69,9 +71,10 @@ export default function MapPlanner({
     };
   }, []);
 
+  // AGGIORNAMENTO DINAMICO: Ridisegna solo se la mappa è interamente pronta (mapReady)
   useEffect(() => {
     const L = (window as any).L;
-    if (!L || !mapRef.current) return;
+    if (!L || !mapRef.current || !mapReady) return;
 
     if (savedRoofsLayerGroupRef.current) savedRoofsLayerGroupRef.current.clearLayers();
     if (panelsLayerGroupRef.current) panelsLayerGroupRef.current.clearLayers();
@@ -84,11 +87,11 @@ export default function MapPlanner({
 
       drawPanelsForRoof(roof.points, roof.id);
     });
-  }, [panelRotation, savedRoofs]);
+  }, [panelRotation, savedRoofs, mapReady]);
 
   useEffect(() => {
     const L = (window as any).L;
-    if (!L || !mapRef.current) return;
+    if (!L || !mapRef.current || !mapReady) return;
 
     activeMarkersRef.current.forEach(m => m.remove());
     activeMarkersRef.current = [];
@@ -106,13 +109,12 @@ export default function MapPlanner({
         fillOpacity: 0.25
       }).addTo(mapRef.current);
     }
-  }, [currentPoints]);
+  }, [currentPoints, mapReady]);
 
   const initializeMap = () => {
     const L = (window as any).L;
     if (!L) return;
 
-    // Distruzione preventiva per scongiurare l'errore "Map container is already initialized"
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -133,6 +135,9 @@ export default function MapPlanner({
 
     savedRoofsLayerGroupRef.current = L.layerGroup().addTo(map);
     panelsLayerGroupRef.current = L.layerGroup().addTo(map);
+
+    // Dichiara la mappa pronta
+    setMapReady(true);
 
     map.on('click', (e: any) => {
       onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
