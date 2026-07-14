@@ -21,6 +21,14 @@ interface ReportPreviewProps {
   initialCost: number;
 }
 
+const getEnvVar = (value: string | undefined, fallback: string): string => {
+  if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
+  return value.replace(/^["']|["']$/g, '').trim();
+};
+
+const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
+const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
+
 export default function ReportPreview({
   tenant,
   address,
@@ -36,6 +44,12 @@ export default function ReportPreview({
   const [annualProduction, setAnnualProduction] = useState(initialProduction);
   const [annualSavings, setAnnualSavings] = useState(initialSavings);
   const [estimatedCost, setEstimatedCost] = useState(initialCost);
+
+  // Stati per la generazione del link pubblico
+  const [isSaving, setIsSaving] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setAreaSqm(totalArea);
@@ -55,23 +69,15 @@ export default function ReportPreview({
     }, 1000);
   };
 
-  // Funzione logica per convertire questo preventivo in un cantiere reale nel CRM
+  // 1. Converte questo preventivo in un cantiere reale nel CRM
   const handleConvertToCantiere = async () => {
     if (!tenant) return;
-
-    // Funzione di inizializzazione sicura per prevenire stringhe "undefined" o vuote
-    const getEnvVar = (value: string | undefined, fallback: string): string => {
-      if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
-      return value.replace(/^["']|["']$/g, '').trim();
-    };
-    const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
-    const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
 
     const payload = {
       tenant_id: tenant.id,
       customer_name: address ? `Cantiere ${address.split(',')[0]}` : "Nuovo Cantiere",
       address: address || "Indirizzo non specificato",
-      monthly_bill_euro: Math.round(annualSavings / 12), // Stima bolletta basata sul risparmio
+      monthly_bill_euro: Math.round(annualSavings / 12),
       status: "sopralluogo",
       notes: `Generato in automatico da PV Planner.\nPotenza impianto stimata: ${peakPower.toFixed(2)} kWp\nNumero moduli totali: ${totalPanels}\nRisparmio economico stimato: €${Math.round(annualSavings)}/anno\nCosto impianto totale: €${estimatedCost.toLocaleString()}`
     };
@@ -96,6 +102,61 @@ export default function ReportPreview({
     } catch (err) {
       console.error("Errore di rete durante la conversione:", err);
     }
+  };
+
+  // 2. Salva il preventivo ed ottiene il Link pubblico della presentazione
+  const handleSaveAndGenerateLink = async () => {
+    if (!tenant || isSaving) return;
+    setIsSaving(true);
+
+    const payload = {
+      tenant_id: tenant.id,
+      project_name: address ? `Studio di Fattibilità - ${address.split(',')[0]}` : "Preventivo Fotovoltaico Industriale",
+      address: address || "Indirizzo non specificato",
+      total_power_kw: peakPower,
+      panel_count: totalPanels,
+      estimated_cost_euro: estimatedCost,
+      total_area_sqm: areaSqm,
+      annual_production_kwh: annualProduction,
+      annual_savings_euro: annualSavings,
+      monthly_bill_euro: Math.round(annualSavings / 12)
+    };
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/pv_reports`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation' // Chiede a Supabase di restituire la riga creata
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const createdData = await response.json();
+        if (createdData && createdData.length > 0) {
+          const reportId = createdData[0].id;
+          const shareLink = `https://free-energy.rmstudio.app/preventivo/${reportId}`;
+          setGeneratedLink(shareLink);
+          setShowLinkModal(true);
+        }
+      } else {
+        const errText = await response.text();
+        console.error("Errore salvataggio preventivo:", errText);
+      }
+    } catch (err) {
+      console.error("Errore di rete durante il salvataggio:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(generatedLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const totalPanels = savedRoofs.reduce((acc, r) => acc + r.panelCount, 0);
@@ -142,7 +203,7 @@ export default function ReportPreview({
                 className="h-12 max-w-[200px] object-contain print:text-black" 
               />
             ) : (
-              <div className="px-4 py-2 rounded-xl text-white font-black text-xl tracking-tight" style={{ backgroundColor: brandColor }}>
+              <div className="px-4 py-2 rounded-xl text-white font-black text-xl tracking-tight shrink-0" style={{ backgroundColor: brandColor }}>
                 {tenant?.company_name ? tenant.company_name.substring(0, 2).toUpperCase() : 'SL'}
               </div>
             )}
@@ -245,25 +306,78 @@ export default function ReportPreview({
         </div>
       </div>
 
-      <div className="border-t border-zinc-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 print:hidden">
-        <span className="text-xs text-zinc-500 max-w-xl">
-          *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di premere esporta per allinearli ai tuoi listini esatti.
+      {/* PANNELLO AZIONI (CONVERSIONE, GENERAZIONE E STAMPA) */}
+      <div className="border-t border-zinc-800 pt-6 flex flex-col lg:flex-row items-center justify-between gap-4 print:hidden">
+        <span className="text-xs text-zinc-500 max-w-sm">
+          *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di salvare la presentazione o stampare per allinearli ai tuoi listini esatti.
         </span>
-        <div className="flex space-x-3 w-full md:w-auto">
+        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
           <button 
             onClick={handleConvertToCantiere}
-            className="flex-1 md:flex-initial px-6 py-3 bg-zinc-800 hover:bg-zinc-750 text-white font-bold rounded-xl text-sm transition"
+            className="flex-1 lg:flex-initial px-5 py-3 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 font-bold rounded-xl text-sm transition"
           >
             🚀 Apri Cantiere
           </button>
           <button 
+            onClick={handleSaveAndGenerateLink}
+            disabled={isSaving}
+            className="flex-1 lg:flex-initial px-5 py-3 bg-indigo-650 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition disabled:opacity-50"
+          >
+            {isSaving ? "Generazione link..." : "🌐 Condividi Presentazione Web"}
+          </button>
+          <button 
             onClick={handlePrintPdf} 
-            className="flex-1 md:flex-initial px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition"
+            className="flex-1 lg:flex-initial px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition"
           >
             🖨️ Stampa / Esporta PDF
           </button>
         </div>
       </div>
+
+      {/* POPUP MODALE DI CONDIVISIONE LINK GENERATO */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6 animate-fadeIn">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-lg relative space-y-6 shadow-2xl">
+            <button 
+              onClick={() => setShowLinkModal(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white"
+            >
+              ✕
+            </button>
+            <div className="text-center">
+              <span className="text-3xl block mb-2">🌐</span>
+              <h2 className="text-xl font-bold text-white">Presentazione Web Generata!</h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                La tua presentazione interattiva a slide è online. Copia il link pubblico qui sotto ed invialo al tuo cliente via WhatsApp o email.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3">
+              <input 
+                type="text" 
+                readOnly 
+                value={generatedLink}
+                className="bg-transparent text-sm text-zinc-300 focus:outline-none w-full select-all font-mono"
+              />
+              <button 
+                onClick={handleCopyLink}
+                className="bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold px-4 py-2 rounded-lg text-white transition shrink-0"
+              >
+                {copied ? "✓ Copiato" : "Copia Link"}
+              </button>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-zinc-800">
+              <button 
+                onClick={() => setShowLinkModal(false)}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs rounded-xl transition"
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
