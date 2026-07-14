@@ -30,6 +30,7 @@ export interface Tenant {
   panel_height_m: number;
   nexus_active: boolean; 
   dentis_active: boolean; 
+  jingle_active?: boolean;
 }
 
 // Tipo per il contesto del Tenant
