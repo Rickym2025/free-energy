@@ -104,11 +104,11 @@ export default function JinglePage({ params }: { params: { id: string } }) {
 
   const totalSlides = 6;
 
-  // Sfondo a sfumatura di brand dinamica per eliminare il nero cupo
-  const backgroundStyle = {
+  // Correzione SWC: uso del tipo generico ": any" al posto di "as React.CSSProperties" [2]
+  const backgroundStyle: any = {
     background: `linear-gradient(135deg, #09090b 0%, ${brandColor}15 50%, #09090b 100%)`,
     '--brand-color': brandColor
-  } as React.CSSProperties;
+  };
 
   return (
     <div className="min-h-screen text-zinc-100 flex flex-col justify-between transition-colors duration-300" style={backgroundStyle}>
@@ -119,7 +119,7 @@ export default function JinglePage({ params }: { params: { id: string } }) {
           {report.tenants?.logo_url ? (
             <img src={report.tenants.logo_url} alt="Logo" className="h-10 max-w-[150px] object-contain" />
           ) : (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-xs" style={{ backgroundColor: brandColor }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-xs shrink-0" style={{ backgroundColor: brandColor }}>
               {report.tenants?.company_name.substring(0, 2).toUpperCase()}
             </div>
           )}
@@ -209,12 +209,12 @@ export default function JinglePage({ params }: { params: { id: string } }) {
               <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl shadow-xl">
                 <span className="text-[10px] text-zinc-550 font-bold block uppercase font-mono">Moduli Fotovoltaici</span>
                 <span className="text-3xl font-black text-white block mt-1">{panelCount}</span>
-                <span className="text-xs text-zinc-450 block mt-0.5">Silicio monocristallino</span>
+                <span className="text-xs text-zinc-455 block mt-0.5">Silicio monocristallino</span>
               </div>
               <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl shadow-xl">
                 <span className="text-[10px] text-zinc-550 font-bold block uppercase font-mono">Superficie Coperta</span>
                 <span className="text-3xl font-black text-white block mt-1">{Math.round(areaSqm)} mq</span>
-                <span className="text-xs text-zinc-450 block mt-0.5">Strutture in alluminio</span>
+                <span className="text-xs text-zinc-455 block mt-0.5">Strutture in alluminio</span>
               </div>
               <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl shadow-xl">
                 <span className="text-[10px] text-zinc-550 font-bold block uppercase font-mono">Produzione Annua</span>
@@ -240,9 +240,9 @@ export default function JinglePage({ params }: { params: { id: string } }) {
                 <span className="text-4xl font-black block mt-1" style={{ color: brandColor }}>
                   {paybackYears > 0 ? `${paybackYears.toFixed(1)} Anni` : "Non disponibile"}
                 </span>
-                <span className="text-xs text-zinc-455 block font-semibold">Dopodiché l'energia prodotta sarà a costo zero.</span>
+                <span className="text-xs text-zinc-455 block mt-1 font-semibold">Dopodiché l'energia prodotta sarà a costo zero.</span>
               </div>
-              <div className="p-4 bg-zinc-950 rounded-xl border border-zinc-850 text-xs text-zinc-450 leading-relaxed leading-relaxed">
+              <div className="p-4 bg-zinc-950 rounded-xl border border-zinc-850 text-xs text-zinc-450 leading-relaxed">
                 <strong>💡 Perché è conveniente:</strong><br />
                 Considerando un costo energetico medio, l'investimento si ripaga in pochi anni. Nei successivi 20 anni di vita utile dell'impianto, l'azienda accumulerà puro profitto operativo e abbatterà le tasse sul consumo energetico.
               </div>
@@ -324,4 +324,39 @@ export default function JinglePage({ params }: { params: { id: string } }) {
         
         {/* Indicatore dei Punti/Pallini della Slide */}
         <div className="flex space-x-2">
-          {Array.from({ length:
+          {Array.from({ length: totalSlides }).map((_, idx) => (
+            <button 
+              key={idx}
+              onClick={() => setCurrentSlide(idx)}
+              className="h-2.5 rounded-full transition-all duration-300"
+              style={{ 
+                width: currentSlide === idx ? '24px' : '10px', 
+                backgroundColor: currentSlide === idx ? brandColor : '#27272a' 
+              }}
+              title={`Vai alla slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+
+        {/* Tasti Avanti / Indietro */}
+        <div className="flex space-x-3 w-full sm:w-auto">
+          <button 
+            disabled={currentSlide === 0}
+            onClick={() => setCurrentSlide(prev => prev - 1)}
+            className="flex-1 sm:flex-initial px-6 py-3 bg-zinc-900/60 hover:bg-zinc-800/80 disabled:opacity-30 border border-zinc-800 text-white font-bold text-xs rounded-xl transition"
+          >
+            ◀ Precedente
+          </button>
+          <button 
+            disabled={currentSlide === totalSlides - 1}
+            onClick={() => setCurrentSlide(prev => prev + 1)}
+            className="flex-1 sm:flex-initial px-6 py-3 bg-zinc-900/60 hover:bg-zinc-800/80 disabled:opacity-30 border border-zinc-800 text-white font-bold text-xs rounded-xl transition"
+          >
+            Successiva ▶
+          </button>
+        </div>
+      </footer>
+
+    </div>
+  );
+}
