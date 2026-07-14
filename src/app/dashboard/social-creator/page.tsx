@@ -15,8 +15,11 @@ export default function SocialCreator() {
   const [systemDetails, setSystemDetails] = useState('Impianto 6 kWp con accumulo da 10kWh e detrazione fiscale al 50%');
   const [platform, setPlatform] = useState('instagram');
   const [marketingAngle, setMarketingAngle] = useState('risparmio');
+  const [numSlides, setNumSlides] = useState(5);
+  const [tone, setTone] = useState('tecnico');
+  
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedSlides, setGeneratedSlides] = useState<any[]>([]); // Cambiato in any[] per supportare stringhe e oggetti
+  const [generatedSlides, setGeneratedSlides] = useState<any[]>([]);
   const [socialCopy, setSocialCopy] = useState<SocialCopy | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
@@ -43,7 +46,9 @@ export default function SocialCreator() {
           location: targetLocation,
           details: systemDetails,
           platform: platform,
-          angle: marketingAngle
+          angle: marketingAngle,
+          num_slides: numSlides,
+          tone: tone
         })
       });
 
@@ -74,18 +79,26 @@ export default function SocialCreator() {
     }
   };
 
-  const handleDownloadSlide = (url: string, index: number) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Slide_${index + 1}_${targetLocation}.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Sbloccato: download in formato Blob per forzare lo scaricamento reale escludendo i blocchi CORS
+  const handleDownloadSlide = async (url: string, index: number) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `Slide_${index + 1}_${targetLocation}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      window.open(url, '_blank');
+    }
   };
 
   const brandColor = tenant?.brand_color_hex || '#0284c7';
 
-  // Helper per estrarre l'indirizzo dell'immagine (se stringa o oggetto JSON Ideogram)
   const getImageUrl = (slide: any) => {
     if (!slide) return '';
     return typeof slide === 'object' ? slide.image_url : slide;
@@ -98,7 +111,7 @@ export default function SocialCreator() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-white">Creatore Post Social</h1>
         <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
-          Genera in tempo reale caroselli grafici ad alto impatto nel formato verticale 4:5, completi di testi asimmetrici, logo e colori aziendali.
+          Genera in tempo reale caroselli grafici ad alto impatto nel formato verticale 3:4, completi di testi asimmetrici, logo e colori aziendali.
         </p>
       </div>
 
@@ -133,6 +146,36 @@ export default function SocialCreator() {
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Numero di Slide</label>
+                <select 
+                  value={numSlides} 
+                  onChange={(e) => setNumSlides(parseInt(e.target.value))} 
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value={3}>3 Slide</option>
+                  <option value={4}>4 Slide</option>
+                  <option value={5}>5 Slide</option>
+                  <option value={6}>6 Slide</option>
+                  <option value={7}>7 Slide</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Tono di Voce</label>
+                <select 
+                  value={tone} 
+                  onChange={(e) => setTone(e.target.value)} 
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="professionale">Professionale</option>
+                  <option value="amichevole">Entusiasta</option>
+                  <option value="tecnico">Tecnico</option>
+                </select>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Formato e Canale</label>
               <select 
@@ -164,7 +207,7 @@ export default function SocialCreator() {
               className="w-full py-4 text-zinc-950 font-bold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 text-sm" 
               style={{ backgroundColor: brandColor }}
             >
-              {isGenerating ? "Creazione Grafica..." : "✨ Genera Carosello (200 crediti)"}
+              {isGenerating ? "Creazione Grafica..." : `✨ Genera Carosello (200 crediti)`}
             </button>
           </form>
         </div>
@@ -187,12 +230,12 @@ export default function SocialCreator() {
             {isGenerating ? (
               <div className="flex flex-col items-center space-y-4 text-center max-w-sm">
                 <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm text-zinc-400">Generazione in corso delle 5 slide fotografiche con il tuo brand...</p>
+                <p className="text-sm text-zinc-400">Generazione in corso delle {numSlides} slide con Ideogram v3...</p>
               </div>
             ) : generatedSlides.length > 0 ? (
               <div className="flex flex-col items-center space-y-6 w-full max-w-[420px]">
                 {/* Visualizzatore Slide 4:5 */}
-                <div className="aspect-[4/5] w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl">
+                <div className="aspect-[3/4] w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl">
                   <img 
                     src={getImageUrl(generatedSlides[currentSlideIndex])} 
                     alt={`Slide ${currentSlideIndex + 1}`}
@@ -242,7 +285,7 @@ export default function SocialCreator() {
             {socialCopy.instagram && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram</span>
-                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.instagram}
                 </p>
               </div>
@@ -252,7 +295,7 @@ export default function SocialCreator() {
             {socialCopy.facebook && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">👥 Facebook</span>
-                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.facebook}
                 </p>
               </div>
@@ -271,17 +314,17 @@ export default function SocialCreator() {
         </div>
       )}
 
-      {/* SEZIONE CONTATTI WEB3FORMS PER RICHIESTA VIDEO EDITORIALI */}
+      {/* SEZIONE CONTATTI WEB3FORMS PER RICHIESTA VIDEO */}
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
         <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 relative z-10 text-white">
           <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_10px_#4ade80]"></span>
-          Richiedi Video Promozionale di Cantiere
+          Richiedi Video Promozionale
         </h2>
         
         <p className="text-zinc-400 mb-8 text-sm relative z-10 leading-relaxed">
-          Vuoi realizzare un video montaggio professionale dei tuoi pannelli solari o del lavoro ultimato? Compila il modulo caricando i tuoi video o foto grezze e i nostri Art Director realizzeranno una clip su misura per te entro 48 ore.
+          Vuoi realizzare una video clip promozionale professionale dei tuoi pannelli solari o del lavoro ultimato? Compila il modulo caricando i tuoi video o foto grezze e i nostri Art Director realizzeranno una clip montata su misura per te entro 48 ore.
         </p>
         
         <form 
@@ -290,9 +333,8 @@ export default function SocialCreator() {
           encType="multipart/form-data"
           className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10"
         >
-          {/* Chiave di Accesso Web3Forms */}
           <input type="hidden" name="access_key" value="9013a8d5-0901-42a0-b9e6-4c45553f960d" />
-          <input type="hidden" name="subject" value={`Richiesta Video Cantiere da: ${tenant?.company_name || 'Installatore'}`} />
+          <input type="hidden" name="subject" value={`Richiesta Video Promozionale da: ${tenant?.company_name || 'Installatore'}`} />
           <input type="hidden" name="redirect" value="https://free-energy.rmstudio.app/dashboard/social-creator" />
           
           <div>
@@ -317,8 +359,20 @@ export default function SocialCreator() {
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Carica Video o Foto di Cantiere (ZIP, MP4, JPG)</label>
+          <div className="space-y-1">
+            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Formato e Servizio Video Richiesto</label>
+            <select 
+              name="video_package"
+              required
+              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm cursor-pointer"
+            >
+              <option value="free_clip">Clip breve montata di cantiere (Gratuito / Incluso)</option>
+              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 150 Crediti)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Carica File di Cantiere (ZIP, MP4, JPG)</label>
             <input 
               type="file" 
               name="attachment" 
@@ -326,7 +380,6 @@ export default function SocialCreator() {
               accept=".zip,.mp4,.mov,.avi,.jpg,.png"
               className="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer" 
             />
-            <span className="text-[10px] text-zinc-500 mt-1 block">Invia un archivio ZIP contenente le clip del cantiere (dimensione massima: 20MB).</span>
           </div>
 
           <div className="md:col-span-2">
