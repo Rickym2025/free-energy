@@ -113,7 +113,7 @@ export default function ReportPreview({
       tenant_id: tenant.id,
       project_name: address ? `Studio di Fattibilità - ${address.split(',')[0]}` : "Preventivo Fotovoltaico Industriale",
       address: address || "Indirizzo non specificato",
-      total_power_kw: peakPower,
+      estimated_power_kwp: peakPower,
       panel_count: totalPanels,
       estimated_cost_euro: estimatedCost,
       roof_area_sqm: areaSqm,
