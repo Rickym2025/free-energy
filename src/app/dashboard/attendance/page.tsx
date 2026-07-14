@@ -28,6 +28,17 @@ interface AttendanceRecord {
   leads?: { customer_name: string };
 }
 
+interface Rapportino {
+  id: string;
+  tenant_id: string;
+  worker_id: string;
+  cantiere_id: string;
+  photo_url: string;
+  notes: string;
+  created_at: string;
+  leads?: { customer_name: string };
+}
+
 const getEnvVar = (value: string | undefined, fallback: string): string => {
   if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
   return value.replace(/^["']|["']$/g, '').trim();
@@ -44,10 +55,14 @@ export default function AttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [cantieri, setCantieri] = useState<Cantiere[]>([]);
+  const [rapportini, setRapportini] = useState<Rapportino[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Stato per il lavoratore attualmente selezionato per visualizzare il suo storico personale
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
+
+  // Stato per ingrandire la foto del rapportino a schermo intero (Lightbox)
+  const [fullscreenPhotoUrl, setFullscreenPhotoUrl] = useState<string | null>(null);
 
   // Stati per Modale (Rettifica / Inserimento)
   const [showModal, setShowModal] = useState(false);
@@ -79,7 +94,8 @@ export default function AttendancePage() {
       await Promise.all([
         fetchAttendance(),
         fetchWorkers(),
-        fetchCantieri()
+        fetchCantieri(),
+        fetchRapportini()
       ]);
     } catch (err) {
       console.error("Errore scaricamento dati presenze:", err);
@@ -131,6 +147,28 @@ export default function AttendancePage() {
       const data = await response.json();
       setCantieri(data);
       if (data.length > 0) setFormCantiereId(data[0].id);
+    }
+  };
+
+  // Carica i Rapportini di fine giornata inviati su Telegram
+  const fetchRapportini = async () => {
+    if (!tenant) return;
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/rapportini?tenant_id=eq.${tenant.id}&select=*,leads(customer_name)&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setRapportini(data);
+      }
+    } catch (e) {
+      console.error("Errore fetch rapportini:", e);
     }
   };
 
@@ -226,9 +264,12 @@ export default function AttendancePage() {
     return date.toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  // Funzione helper per ottenere le timbrature di uno specifico lavoratore
   const getWorkerRecords = (workerId: string) => {
     return records.filter(r => r.worker_id === workerId);
+  };
+
+  const getWorkerRapportini = (workerId: string) => {
+    return rapportini.filter(r => r.worker_id === workerId);
   };
 
   const activeWorkersCount = records.filter(r => r.check_out_time === null).length;
@@ -240,9 +281,9 @@ export default function AttendancePage() {
       {/* INTESTAZIONE */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800 pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Registro Presenze</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Registro Presenze & Rapportini</h1>
           <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
-            Gestisci in modo centralizzato gli ingressi e le uscite degli operai dai cantieri fotovoltaici della tua azienda.
+            Gestisci in modo centralizzato gli orari d'ingresso, le uscite e le foto dei rapportini giornalieri inviati dagli operai in cantiere.
           </p>
         </div>
         <button 
@@ -253,7 +294,7 @@ export default function AttendancePage() {
         </button>
       </div>
 
-      {/* COMPORTAMENTO SCHEDE (TAB): TIMBRATURE VS DIPENDENTI */}
+      {/* SCHEDE PRINCIPALI (TAB) */}
       <div className="flex space-x-2 bg-zinc-950 p-1.5 rounded-xl border border-zinc-850 w-full md:w-fit">
         <button 
           onClick={() => { setActiveTab('timbrature'); setSelectedWorker(null); }} 
@@ -288,7 +329,7 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* TABELLA REGISTRO */}
+          {/* TABELLA LOG REGISTRO */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-6 border-b border-zinc-800">
               <h2 className="text-lg font-bold text-white">Registro d'Ingresso e Uscita Giornaliero</h2>
@@ -313,7 +354,7 @@ export default function AttendancePage() {
                   <tbody className="divide-y divide-zinc-800">
                     {records.map((rec) => (
                       <tr key={rec.id} className="hover:bg-zinc-850/50 transition duration-150">
-                        <td className="p-4 pl-6 font-bold text-white">{rec.workers?.name || "Operaio rimosso"}</td>
+                        <td className="p-4 pl-6 font-bold text-white">{rec.workers?.name || "Lavoratore rimosso"}</td>
                         <td className="p-4 text-zinc-300">{rec.leads?.customer_name || "Cantiere rimosso"}</td>
                         <td className="p-4 text-zinc-300 font-semibold">{formatDateTime(rec.check_in_time)}</td>
                         <td className="p-4 text-zinc-300">
@@ -347,18 +388,18 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* SCHEDA 2: ANAGRAFICA DIPENDENTI (ELENCO OPERAI) */}
+      {/* SCHEDA 2: ANAGRAFICA DIPENDENTI (STORICO E RAPPORTINI) */}
       {activeTab === 'dipendenti' && (
         <div className="space-y-6 animate-fadeIn">
           {loading ? (
-            <div className="p-12 text-center text-zinc-500 text-sm">Caricamento elenco dipendenti in corso...</div>
+            <div className="p-12 text-center text-zinc-500 text-sm">Caricamento elenco dipendenti...</div>
           ) : workers.length === 0 ? (
             <div className="p-12 text-center text-zinc-500 text-sm">Nessun dipendente registrato in piattaforma.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* LISTA DELLE SCHEDE DIPENDENTI */}
-              <div className="space-y-3">
+              {/* LISTA SINISTRA: SCHEDE DIPENDENTI (4 COLONNE) */}
+              <div className="lg:col-span-5 space-y-3">
                 <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider block font-mono px-1">Seleziona un Lavoratore per ispezionare il registro:</span>
                 {workers.map((w) => {
                   const workerRecs = getWorkerRecords(w.id);
@@ -377,11 +418,11 @@ export default function AttendancePage() {
                           {activeRecord ? `🟢 Attivo su: ${activeRecord.leads?.customer_name}` : "🔴 Non in Cantiere"}
                         </p>
                       </div>
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-3">
                         {workerAlerts > 0 && (
-                          <span className="text-[10px] bg-rose-950 text-rose-400 px-2 py-1 rounded font-bold font-mono">⚠️ {workerAlerts} Alert GPS</span>
+                          <span className="text-[10px] bg-rose-950 text-rose-400 px-2 py-1 rounded font-bold font-mono">⚠️ {workerAlerts} Alert</span>
                         )}
-                        <span className="text-xs bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded text-zinc-350">
+                        <span className="text-xs bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded text-zinc-350 font-semibold font-mono">
                           {workerRecs.length} Giornate
                         </span>
                       </div>
@@ -390,36 +431,50 @@ export default function AttendancePage() {
                 })}
               </div>
 
-              {/* DETTAGLIO SITUAZIONE LAVORATORE SELEZIONATO */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 h-fit space-y-6 shadow-xl min-h-[300px] flex flex-col justify-between">
+              {/* DETTAGLIO SITUAZIONE E GALLERY RAPPORTINI (8 COLONNE) */}
+              <div className="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl min-h-[450px] space-y-8">
                 {selectedWorker ? (
-                  <div className="space-y-6 animate-fadeIn">
+                  <div className="space-y-8 animate-fadeIn">
                     
+                    {/* Intestazione Dipendente */}
                     <div className="border-b border-zinc-800 pb-4">
                       <h3 className="text-xl font-bold text-white">{selectedWorker.name}</h3>
-                      <p className="text-xs text-zinc-500 mt-1">Registrato in piattaforma il: {new Date(selectedWorker.created_at || '').toLocaleDateString('it-IT')}</p>
+                      <p className="text-xs text-zinc-500 mt-1">Registrato il: {new Date(selectedWorker.created_at || '').toLocaleDateString('it-IT')}</p>
                     </div>
 
-                    <div className="space-y-4">
-                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block font-mono">Storico Presenze Personale:</span>
+                    {/* STORICO RAPPORTINI FOTOGRAFICI (GALLERY) */}
+                    <div className="space-y-3">
+                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block font-mono">📸 Rapportini Fotografici di Fine Giornata:</span>
                       
-                      {getWorkerRecords(selectedWorker.id).length === 0 ? (
-                        <p className="text-sm text-zinc-500 italic">Nessun ingresso registrato per questo dipendente.</p>
+                      {getWorkerRapportini(selectedWorker.id).length === 0 ? (
+                        <p className="text-sm text-zinc-500 italic">Nessun rapportino fotografico inviato da questo dipendente.</p>
                       ) : (
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto no-scrollbar divide-y divide-zinc-800/80">
-                          {getWorkerRecords(selectedWorker.id).map((rec) => (
-                            <div key={rec.id} className="pt-3 flex items-center justify-between text-xs">
-                              <div>
-                                <span className="font-semibold text-zinc-300 block">{rec.leads?.customer_name}</span>
-                                <span className="text-zinc-500 block mt-0.5">
-                                  {formatDateTime(rec.check_in_time)} → {rec.check_out_time ? formatDateTime(rec.check_out_time) : "Al Lavoro"}
-                                </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {getWorkerRapportini(selectedWorker.id).map((rap) => (
+                            <div key={rap.id} className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-md flex flex-col justify-between">
+                              {/* Thumbnail Immagine */}
+                              <div 
+                                onClick={() => setFullscreenPhotoUrl(rap.photo_url)}
+                                className="aspect-[4/3] w-full bg-black cursor-zoom-in relative overflow-hidden group"
+                              >
+                                <img 
+                                  src={rap.photo_url} 
+                                  alt="Rapportino" 
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
                               </div>
-                              <div>
-                                {rec.is_valid_distance ? (
-                                  <span className="text-emerald-400">📍 GPS OK</span>
+                              {/* Testo e Dati del Rapporto */}
+                              <div className="p-4 space-y-2">
+                                <div className="flex justify-between items-start text-[10px] text-zinc-500 font-semibold font-mono">
+                                  <span>{formatDateTime(rap.created_at)}</span>
+                                  <span className="text-emerald-400 truncate max-w-[150px]">{rap.leads?.customer_name || "Cantiere Sconosciuto"}</span>
+                                </div>
+                                {rap.notes ? (
+                                  <p className="text-xs text-zinc-300 leading-relaxed italic bg-zinc-900 p-2.5 rounded border border-zinc-800">
+                                    "{rap.notes}"
+                                  </p>
                                 ) : (
-                                  <span className="text-rose-400" title={`Distanza: ${rec.distance_meters} metri`}>⚠️ Alert ({Math.round(rec.distance_meters || 0)}m)</span>
+                                  <p className="text-xs text-zinc-600 italic">Nessuna nota descrittiva inviata.</p>
                                 )}
                               </div>
                             </div>
@@ -427,11 +482,41 @@ export default function AttendancePage() {
                         </div>
                       )}
                     </div>
+
+                    {/* TABELLA STORICO TIMBRATURE PERSONALE */}
+                    <div className="space-y-3 border-t border-zinc-800 pt-6">
+                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block font-mono">🕒 Registro Timbrature Personale:</span>
+                      
+                      {getWorkerRecords(selectedWorker.id).length === 0 ? (
+                        <p className="text-sm text-zinc-500 italic">Nessun ingresso registrato per questo dipendente.</p>
+                      ) : (
+                        <div className="space-y-2 max-h-[220px] overflow-y-auto no-scrollbar divide-y divide-zinc-800">
+                          {getWorkerRecords(selectedWorker.id).map((rec) => (
+                            <div key={rec.id} className="pt-3 flex items-center justify-between text-xs">
+                              <div>
+                                <span className="font-semibold text-zinc-300 block">{rec.leads?.customer_name}</span>
+                                <span className="text-zinc-550 block mt-0.5">
+                                  {formatDateTime(rec.check_in_time)} → {rec.check_out_time ? formatDateTime(rec.check_out_time) : "In Cantiere"}
+                                </span>
+                              </div>
+                              <div>
+                                {rec.is_valid_distance ? (
+                                  <span className="text-emerald-400 font-bold">📍 OK</span>
+                                ) : (
+                                  <span className="text-rose-400 font-bold" title={`Distanza: ${rec.distance_meters} metri`}>⚠️ Alert ({Math.round(rec.distance_meters || 0)}m)</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8 h-full">
                     <span className="text-4xl block mb-4">👷‍♂️</span>
-                    <p className="text-sm text-zinc-500">Seleziona un lavoratore dall'elenco a sinistra per visualizzare la sua anagrafica e tutte le sue timbrature.</p>
+                    <p className="text-sm text-zinc-500">Seleziona un lavoratore dall'elenco a sinistra per visualizzare la sua anagrafica, i suoi rapportini e lo storico presenze.</p>
                   </div>
                 )}
               </div>
@@ -560,6 +645,21 @@ export default function AttendancePage() {
 
             </form>
           </div>
+        </div>
+      )}
+
+      {/* COMPORTAMENTO LIGHTBOX: INGRANDIMENTO FOTO A SCHERMO INTERO */}
+      {fullscreenPhotoUrl && (
+        <div 
+          onClick={() => setFullscreenPhotoUrl(null)}
+          className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 cursor-zoom-out animate-fadeIn"
+        >
+          <img 
+            src={fullscreenPhotoUrl} 
+            alt="Rapportino Ingrandito" 
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl border border-zinc-800"
+          />
+          <button className="absolute top-6 right-6 text-white bg-zinc-900/60 border border-zinc-800 p-3 rounded-full text-xl hover:bg-zinc-800">✕</button>
         </div>
       )}
 
