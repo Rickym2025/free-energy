@@ -21,10 +21,22 @@ interface SavedRoof {
   deletedPanels: string[]; // Memorizza gli ID dei moduli rimossi manualmente (ostacoli)
 }
 
+const getEnvVar = (value: string | undefined, fallback: string): string => {
+  if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
+  return value.replace(/^["']|["']$/g, '').trim();
+};
+
+const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
+const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
+
 export default function PvPlanner() {
   const { tenant, deductCredits } = useTenant();
   
   const brandColor = tenant?.brand_color_hex || '#0284c7';
+
+  // Storico preventivi cloud
+  const [savedReports, setSavedReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(true);
 
   const [address, setAddress] = useState('');
   const [loadingGeocode, setLoadingGeocode] = useState(false);
@@ -54,6 +66,12 @@ export default function PvPlanner() {
   const [monthlyBill, setMonthlyBill] = useState('600');
 
   useEffect(() => {
+    if (tenant) {
+      fetchSavedReports();
+    }
+  }, [tenant]);
+
+  useEffect(() => {
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
 
@@ -74,6 +92,59 @@ export default function PvPlanner() {
     }
   }, [isCalculated]);
 
+  // Scarica l'elenco dei preventivi generati in precedenza da Supabase
+  const fetchSavedReports = async () => {
+    if (!tenant) return;
+    setLoadingReports(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/pv_reports?tenant_id=eq.${tenant.id}&order=created_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+      if (response.ok) {
+        setSavedReports(await response.json());
+      }
+    } catch (e) {
+      console.error("Errore fetch preventivi salvati:", e);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  // Carica ed inserisce in tempo reale le geometrie delle falde salvate sulla mappa
+  const handleLoadSavedReport = (report: any) => {
+    handleResetPlanner();
+    setAddress(report.address);
+    
+    let parsedRoofs: SavedRoof[] = [];
+    if (typeof report.raw_geojson === 'string') {
+      try {
+        parsedRoofs = JSON.parse(report.raw_geojson);
+      } catch (err) {}
+    } else if (report.raw_geojson) {
+      parsedRoofs = report.raw_geojson;
+    }
+
+    setSavedRoofs(parsedRoofs);
+    
+    // Configura parametri economici salvati
+    setPeakPower(report.estimated_power_kwp || 0);
+    setEstimatedCost(report.estimated_cost_euro || 0);
+    setTotalAreaSqm(report.roof_area_sqm || report.total_area_sqm || 0);
+    setAnnualProduction(report.annual_production_kwh || 0);
+    setAnnualSavings(report.annual_savings_euro || 0);
+    setMonthlyBill(String(report.monthly_bill_euro || 600));
+
+    // Centra la mappa satellitare sulle coordinate della prima falda caricata
+    if (parsedRoofs.length > 0 && parsedRoofs[0].points.length > 0) {
+      setMapCenter(parsedRoofs[0].points[0]);
+    }
+    
+    setIsCalculated(true); // Mostra direttamente l'anteprima economica modificabile
+  };
+
   const handleMapClick = (point: Coordinate) => {
     if (isCalculated) return;
     setCurrentPoints(prev => [...prev, point]);
@@ -83,7 +154,6 @@ export default function PvPlanner() {
     setCurrentPoints(prev => prev.map((p, idx) => idx === index ? newCoord : p));
   };
 
-  // AGGIORNATO: Ricalcola interamente geometrie, lati e moduli di un tetto SALVATO quando viene trascinato un pin
   const handleSavedRoofMarkerDrag = (roofId: string, index: number, newCoord: Coordinate) => {
     const pWidth = tenant?.panel_width_m || 1.65;
     const pHeight = tenant?.panel_height_m || 1.0;
@@ -93,7 +163,6 @@ export default function PvPlanner() {
         const nextPoints = r.points.map((p, idx) => idx === index ? newCoord : p);
         const area = calculateAreaInSqm(nextPoints);
         
-        // Ricalcola i lati in metri
         const lengths: number[] = [];
         for (let i = 0; i < nextPoints.length; i++) {
           const p1 = nextPoints[i];
@@ -150,14 +219,13 @@ export default function PvPlanner() {
       area,
       panelCount,
       lengths,
-      deletedPanels: [] // Inizialmente nessun modulo escluso
+      deletedPanels: [] 
     };
 
     setSavedRoofs(prev => [...prev, newRoof]);
     clearMapPoints();
   };
 
-  // AGGIORNATO: Registra la chiave cartesiana del pannello eliminato per escluderlo stabilmente
   const handlePanelDeleted = (roofId: string, panelKey: string) => {
     setSavedRoofs(prev => prev.map(r => {
       if (r.id === roofId) {
@@ -225,7 +293,7 @@ export default function PvPlanner() {
     const finalCostCalculated = Math.round(costTotal);
     setEstimatedCost(finalCostCalculated);
 
-    const success = await deductCredits(150, `Studio di Fattibilità Industriale (${savedRoofs.length} falde): ${address}`);
+    const success = await deductCredits(100, `Studio di Fattibilità Industriale (${savedRoofs.length} falde): ${address}`);
     if (!success) return;
 
     setLoadingGeocode(true);
@@ -237,12 +305,14 @@ export default function PvPlanner() {
       setAnnualProduction(productionVal);
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, productionVal * 0.25));
       setIsCalculated(true);
+      await fetchSavedReports(); // Ricarica lo storico per mostrare il preventivo appena generato
     } catch (err) {
       console.warn("Calcolo locale di fallback energetico");
       const localProductionEstimate = estimPeakPower * 1350;
       setAnnualProduction(localProductionEstimate);
       setAnnualSavings(Math.min(parseFloat(monthlyBill) * 12 * 0.85, localProductionEstimate * 0.25));
       setIsCalculated(true);
+      await fetchSavedReports();
     } finally {
       setLoadingGeocode(false);
     }
@@ -318,7 +388,7 @@ export default function PvPlanner() {
           onRenameRoof={handleRenameRoof} onUpdateLength={handleUpdateLength}
           onGenerateReport={handleGenerateReport}
           onResetPlanner={handleResetPlanner}
-          onSelectRoof={setSelectedRoofId} // Imposta l'area selezionata per il drag
+          onSelectRoof={setSelectedRoofId} 
         />
 
         <div className="lg:col-span-2 flex flex-col h-[520px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative print:block print:h-[350px] print:w-full print:mb-8 print:border print:border-zinc-300 print:rounded-2xl">
@@ -334,7 +404,7 @@ export default function PvPlanner() {
             onMapClick={handleMapClick}
             onPanelDeleted={handlePanelDeleted}
             onMarkerDrag={handleMarkerDrag}
-            onSavedRoofMarkerDrag={handleSavedRoofMarkerDrag} // Gestisce il trascinamento dei punti salvati
+            onSavedRoofMarkerDrag={handleSavedRoofMarkerDrag} 
           />
         </div>
       </div>
@@ -353,6 +423,56 @@ export default function PvPlanner() {
           />
         </div>
       )}
+
+      {/* ARCHIVIO PREVENTIVI SALVATI IN CLOUD (FASE 3) */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl print:hidden">
+        <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/20">
+          <h2 className="text-lg font-bold text-white">Archivio Preventivi in Cloud</h2>
+          <span className="text-xs font-mono font-bold" style={{ color: brandColor }}>Storico Analisi</span>
+        </div>
+
+        {loadingReports ? (
+          <div className="p-12 text-center text-zinc-500 text-sm">Lettura archivio in corso...</div>
+        ) : savedReports.length === 0 ? (
+          <div className="p-12 text-center text-zinc-500 text-sm">Nessun preventivo registrato finora. Genera un preventivo sopra per salvarlo.</div>
+        ) : (
+          <div className="divide-y divide-zinc-800">
+            {savedReports.map((report) => (
+              <div 
+                key={report.id} 
+                onClick={() => handleLoadSavedReport(report)}
+                className="p-6 flex flex-col md:flex-row md:items-center justify-between hover:bg-zinc-850/50 cursor-pointer transition duration-150 gap-4"
+              >
+                <div className="space-y-1">
+                  <h3 className="font-bold text-white">{report.project_name || "Analisi Satellitare"}</h3>
+                  <p className="text-xs text-zinc-400">📍 Sito: {report.address} &bull; Creato il: {new Date(report.created_at).toLocaleDateString('it-IT')}</p>
+                </div>
+                <div className="flex items-center space-x-6 justify-between md:justify-end shrink-0">
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-emerald-400 block" style={{ color: brandColor }}>
+                      {report.estimated_power_kwp ? `${report.estimated_power_kwp.toFixed(2)} kWp` : "- kWp"}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 block">Potenza Stimata</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-white block">
+                      {report.estimated_cost_euro ? `€ ${report.estimated_cost_euro.toLocaleString()}` : "Da calcolare"}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 block">Prezzo Totale</span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleLoadSavedReport(report); }}
+                    className="text-xs bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-350 font-semibold px-4 py-2 rounded-xl transition"
+                  >
+                    📂 Riprendi e Modifica
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
