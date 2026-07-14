@@ -14,13 +14,14 @@ interface Report {
   id: string;
   project_name: string;
   address: string;
-  total_power_kw: number;
-  panel_count: number;
-  estimated_cost_euro: number;
-  total_area_sqm: number;
-  annual_production_kwh: number;
-  annual_savings_euro: number;
-  monthly_bill_euro: number;
+  estimated_power_kwp: number | null;
+  panel_count: number | null;
+  estimated_cost_euro: number | null;
+  total_area_sqm: number | null;
+  roof_area_sqm: number | null;
+  annual_production_kwh: number | null;
+  annual_savings_euro: number | null;
+  monthly_bill_euro: number | null;
   tenants: Tenant;
 }
 
@@ -86,20 +87,34 @@ export default function JinglePage({ params }: { params: { id: string } }) {
 
   const brandColor = report.tenants?.brand_color_hex || '#0284c7';
   
+  // Dati di sicurezza per prevenire errori 'toFixed' su record nulli storici [4]
+  const powerKwp = report.estimated_power_kwp || 0;
+  const panelCount = report.panel_count || 0;
+  const areaSqm = report.roof_area_sqm || report.total_area_sqm || 0;
+  const annualProd = report.annual_production_kwh || 0;
+  const annualSav = report.annual_savings_euro || 0;
+  const estimatedCost = report.estimated_cost_euro || 0;
+
   // Calcolo del rientro dell'investimento (ROI)
-  const paybackYears = report.estimated_cost_euro / report.annual_savings_euro;
+  const paybackYears = annualSav > 0 ? (estimatedCost / annualSav) : 0;
   
   // Impatto ecologico stimato
-  const co2SavedTons = (report.annual_production_kwh * 0.4) / 1000; // 0.4kg CO2 per kWh
+  const co2SavedTons = (annualProd * 0.4) / 1000; // 0.4kg CO2 per kWh
   const treesPlanted = Math.round(co2SavedTons * 45); // ~45 alberi per tonnellata di CO2
 
   const totalSlides = 6;
 
+  // Sfondo a sfumatura di brand dinamica per eliminare il nero cupo
+  const backgroundStyle = {
+    background: `linear-gradient(135deg, #09090b 0%, ${brandColor}15 50%, #09090b 100%)`,
+    '--brand-color': brandColor
+  } as React.CSSProperties;
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between" style={{ '--brand-color': brandColor } as React.CSSProperties}>
+    <div className="min-h-screen text-zinc-100 flex flex-col justify-between transition-colors duration-300" style={backgroundStyle}>
       
       {/* 1. BARRA DI TESTATA (BRAND IDENTITY) */}
-      <header className="p-6 bg-zinc-900/40 backdrop-blur border-b border-zinc-900 flex justify-between items-center">
+      <header className="p-6 bg-zinc-900/40 backdrop-blur-md border-b border-zinc-900/60 flex justify-between items-center">
         <div className="flex items-center space-x-3">
           {report.tenants?.logo_url ? (
             <img src={report.tenants.logo_url} alt="Logo" className="h-10 max-w-[150px] object-contain" />
@@ -113,21 +128,21 @@ export default function JinglePage({ params }: { params: { id: string } }) {
         <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Studio di Fattibilità Solare</span>
       </header>
 
-      {/* 2. AREA DELLE SLIDE (CONTENUTO INTERATTIVO) */}
+      {/* 2. AREA DELLE SLIDE */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-12 flex items-center justify-center">
         
-        {/* SLIDE 1: COPERTINA E PRESENTAZIONE */}
+        {/* SLIDE 1: COPERTINA */}
         {currentSlide === 0 && (
           <div className="space-y-6 animate-fadeIn text-left w-full">
             <span className="text-xs font-bold uppercase tracking-widest block font-mono" style={{ color: brandColor }}>Slide 01 // Benvenuto</span>
             <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
               Studio di Fattibilità Fotovoltaica per <br />
-              <span style={{ color: brandColor }}>{report.project_name.split('-').pop()?.trim()}</span>
+              <span style={{ color: brandColor }}>{report.project_name ? report.project_name.split('-').pop()?.trim() : "La tua Azienda"}</span>
             </h2>
             <p className="text-zinc-400 text-sm md:text-base leading-relaxed max-w-2xl">
               Abbiamo scansionato via satellite le coperture del tuo immobile situato in <strong className="text-white">{report.address}</strong>. Di seguito ti presentiamo la simulazione tecnica ed il rendimento finanziario stimato.
             </p>
-            <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl flex items-center space-x-4 max-w-md">
+            <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl flex items-center space-x-4 max-w-md shadow-xl">
               <span className="text-2xl">🛰️</span>
               <div className="text-xs text-zinc-400 space-y-0.5">
                 <span className="font-bold text-white block text-sm">Analisi Satellitare Completata</span>
@@ -143,38 +158,37 @@ export default function JinglePage({ params }: { params: { id: string } }) {
             <span className="text-xs font-bold uppercase tracking-widest block font-mono" style={{ color: brandColor }}>Slide 02 // Risparmio Economico</span>
             <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Il Risparmio Energetico nel Tempo</h2>
             <p className="text-zinc-400 text-sm leading-relaxed">
-              Installando un impianto da <strong className="text-white">{report.total_power_kw.toFixed(2)} kWp</strong>, riduci all'istante l'acquisto di energia dalla rete nazionale.
+              Installando un impianto da <strong className="text-white">{powerKwp.toFixed(2)} kWp</strong> [4], riduci all'istante l'acquisto di energia dalla rete nazionale.
             </p>
 
-            {/* Grafico di risparmio semplificato in puro CSS/HTML */}
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4">
+            <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl space-y-4 shadow-xl">
               <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block font-mono">Risparmio Economico Accumulato (Stima):</span>
               <div className="space-y-3 pt-2">
                 <div>
                   <div className="flex justify-between text-xs text-zinc-400 mb-1">
                     <span>Anno 1 (Risparmio immediato)</span>
-                    <span className="font-bold text-white">€ {Math.round(report.annual_savings_euro).toLocaleString()}</span>
+                    <span className="font-bold text-white">€ {Math.round(annualSav).toLocaleString()}</span>
                   </div>
-                  <div className="w-full bg-zinc-950 h-3.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-zinc-950 h-3.5 rounded-full overflow-hidden border border-zinc-800">
                     <div className="h-full rounded-full" style={{ backgroundColor: brandColor, width: '10%' }}></div>
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs text-zinc-400 mb-1">
                     <span>Anno 5 (Rientro investimento completato)</span>
-                    <span className="font-bold text-white">€ {Math.round(report.annual_savings_euro * 5).toLocaleString()}</span>
+                    <span className="font-bold text-white">€ {Math.round(annualSav * 5).toLocaleString()}</span>
                   </div>
-                  <div className="w-full bg-zinc-950 h-3.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-zinc-950 h-3.5 rounded-full overflow-hidden border border-zinc-800">
                     <div className="h-full rounded-full" style={{ backgroundColor: brandColor, width: '45%' }}></div>
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs text-zinc-400 mb-1">
                     <span>Anno 15 (Puro Profitto Cumulato)</span>
-                    <span className="font-bold text-emerald-400 font-extrabold">€ {Math.round(report.annual_savings_euro * 15).toLocaleString()}</span>
+                    <span className="font-bold text-emerald-450 font-extrabold" style={{ color: brandColor }}>€ {Math.round(annualSav * 15).toLocaleString()}</span>
                   </div>
-                  <div className="w-full bg-zinc-950 h-3.5 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-500" style={{ width: '100%' }}></div>
+                  <div className="w-full bg-zinc-950 h-3.5 rounded-full overflow-hidden border border-zinc-800">
+                    <div className="h-full rounded-full" style={{ backgroundColor: brandColor, width: '100%' }}></div>
                   </div>
                 </div>
               </div>
@@ -192,20 +206,20 @@ export default function JinglePage({ params }: { params: { id: string } }) {
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl">
-                <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">Moduli Fotovoltaici</span>
-                <span className="text-3xl font-black text-white block mt-1">{report.panel_count}</span>
-                <span className="text-xs text-zinc-400 block mt-0.5">Silicio monocristallino</span>
+              <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl shadow-xl">
+                <span className="text-[10px] text-zinc-550 font-bold block uppercase font-mono">Moduli Fotovoltaici</span>
+                <span className="text-3xl font-black text-white block mt-1">{panelCount}</span>
+                <span className="text-xs text-zinc-450 block mt-0.5">Silicio monocristallino</span>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl">
-                <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">Superficie Coperta</span>
-                <span className="text-3xl font-black text-white block mt-1">{Math.round(report.total_area_sqm)} mq</span>
-                <span className="text-xs text-zinc-400 block mt-0.5">Strutture in alluminio</span>
+              <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl shadow-xl">
+                <span className="text-[10px] text-zinc-550 font-bold block uppercase font-mono">Superficie Coperta</span>
+                <span className="text-3xl font-black text-white block mt-1">{Math.round(areaSqm)} mq</span>
+                <span className="text-xs text-zinc-450 block mt-0.5">Strutture in alluminio</span>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl">
-                <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">Produzione Annua</span>
-                <span className="text-3xl font-black text-emerald-400 block mt-1">{Math.round(report.annual_production_kwh).toLocaleString()} kWh</span>
-                <span className="text-xs text-zinc-400 block mt-0.5">Stima database PVGIS</span>
+              <div className="bg-zinc-900/80 border border-zinc-800 p-5 rounded-2xl shadow-xl">
+                <span className="text-[10px] text-zinc-550 font-bold block uppercase font-mono">Produzione Annua</span>
+                <span className="text-3xl font-black block mt-1" style={{ color: brandColor }}>{Math.round(annualProd).toLocaleString()} kWh</span>
+                <span className="text-xs text-zinc-455 block mt-0.5 font-semibold">Stima database PVGIS</span>
               </div>
             </div>
           </div>
@@ -220,17 +234,17 @@ export default function JinglePage({ params }: { params: { id: string } }) {
               Il fotovoltaico industriale non è un costo, ma un bene strumentale ad altissimo rendimento finanziario che si paga da solo nel tempo.
             </p>
 
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-6 items-center shadow-xl">
               <div className="space-y-1">
                 <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">Tempo stimato di ammortamento:</span>
-                <span className="text-4xl font-black text-white block" style={{ color: brandColor }}>
-                  {paybackYears.toFixed(1)} Anni
+                <span className="text-4xl font-black block mt-1" style={{ color: brandColor }}>
+                  {paybackYears > 0 ? `${paybackYears.toFixed(1)} Anni` : "Non disponibile"}
                 </span>
-                <span className="text-xs text-zinc-400 block">Dopodiché l'energia prodotta sarà a costo zero.</span>
+                <span className="text-xs text-zinc-455 block font-semibold">Dopodiché l'energia prodotta sarà a costo zero.</span>
               </div>
-              <div className="p-4 bg-zinc-950 rounded-xl border border-zinc-850 text-xs text-zinc-450 leading-relaxed">
+              <div className="p-4 bg-zinc-950 rounded-xl border border-zinc-850 text-xs text-zinc-450 leading-relaxed leading-relaxed">
                 <strong>💡 Perché è conveniente:</strong><br />
-                Considerando un costo energetico medio, l'investimento si ripaga in meno di {Math.ceil(paybackYears)} anni. Nei successivi 20 anni di vita utile dell'impianto, l'azienda accumulerà puro profitto operativo.
+                Considerando un costo energetico medio, l'investimento si ripaga in pochi anni. Nei successivi 20 anni di vita utile dell'impianto, l'azienda accumulerà puro profitto operativo e abbatterà le tasse sul consumo energetico.
               </div>
             </div>
           </div>
@@ -242,11 +256,11 @@ export default function JinglePage({ params }: { params: { id: string } }) {
             <span className="text-xs font-bold uppercase tracking-widest block font-mono" style={{ color: brandColor }}>Slide 05 // Impatto Ambientale</span>
             <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Sostenibilità e Bilancio ESG</h2>
             <p className="text-zinc-400 text-sm leading-relaxed">
-              Oltre al ritorno economico, l'impianto riduce drasticamente l'impronta di carbonio della tua azienda, migliorando il posizionamento sul mercato.
+              Oltre al ritorno economico, l'impianto riduce drasticamente l'impronta di carbonio della tua azienda, migliorando il posizionamento e l'autorevolezza sul mercato.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl flex items-start space-x-4">
+              <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl flex items-start space-x-4 shadow-xl">
                 <span className="text-3xl shrink-0">🌿</span>
                 <div>
                   <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">CO2 Evitata All'Anno</span>
@@ -254,7 +268,7 @@ export default function JinglePage({ params }: { params: { id: string } }) {
                   <span className="text-xs text-zinc-400 block mt-0.5">Impronta ecologica ridotta</span>
                 </div>
               </div>
-              <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl flex items-start space-x-4">
+              <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl flex items-start space-x-4 shadow-xl">
                 <span className="text-3xl shrink-0">🌳</span>
                 <div>
                   <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">Alberi Equivalenti Piantati</span>
@@ -272,16 +286,15 @@ export default function JinglePage({ params }: { params: { id: string } }) {
             <span className="text-xs font-bold uppercase tracking-widest block font-mono" style={{ color: brandColor }}>Slide 06 // Proposta Economica</span>
             <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Proposta Commerciale "Chiavi in Mano"</h2>
 
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-6 items-center shadow-xl">
               <div>
                 <span className="text-[10px] text-zinc-500 font-bold block uppercase font-mono">Investimento Totale Richiesto:</span>
                 <span className="text-4xl font-black text-white block mt-1" style={{ color: brandColor }}>
-                  € {report.estimated_cost_euro.toLocaleString()}
+                  € {estimatedCost.toLocaleString()}
                 </span>
-                <span className="text-xs text-zinc-400 block mt-1">IVA agevolata 10% inclusa nella fornitura.</span>
+                <span className="text-xs text-zinc-455 block mt-1 font-semibold">IVA agevolata 10% inclusa nella fornitura.</span>
               </div>
 
-              {/* Form di accettazione rapida via WhatsApp */}
               <div className="space-y-3">
                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block font-mono">Accettazione Rapida Proposta:</span>
                 <input 
@@ -292,7 +305,7 @@ export default function JinglePage({ params }: { params: { id: string } }) {
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
                 <a 
-                  href={`https://wa.me/${report.tenants?.phone ? report.tenants.phone.replace(/\D/g, '') : '3912345678'}?text=Ciao%20${encodeURIComponent(report.tenants?.company_name)},%20sono%20favorevole%20alla%20proposta%20fotovoltaica%20per%20l'impianto%20da%20${report.total_power_kw.toFixed(2)}%20kWp.%20Accetto%20con%20firma:%20${encodeURIComponent(clientSignature || 'Cliente')}`}
+                  href={`https://wa.me/${report.tenants?.phone ? report.tenants.phone.replace(/\D/g, '') : '3912345678'}?text=Ciao%20${encodeURIComponent(report.tenants?.company_name)},%20sono%20favorevole%20alla%20proposta%20fotovoltaica%20per%20l'impianto%20da%20${powerKwp.toFixed(2)}%20kWp.%20Accetto%20con%20firma:%20${encodeURIComponent(clientSignature || 'Cliente')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider block text-center transition ${!clientSignature.trim() ? 'opacity-40 pointer-events-none' : ''}`}
@@ -307,43 +320,8 @@ export default function JinglePage({ params }: { params: { id: string } }) {
       </main>
 
       {/* 3. COMANDI DI NAVIGAZIONE IN BASSO (DOCK) */}
-      <footer className="p-6 bg-zinc-950 border-t border-zinc-900/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="p-6 bg-zinc-950/80 border-t border-zinc-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
         
         {/* Indicatore dei Punti/Pallini della Slide */}
         <div className="flex space-x-2">
-          {Array.from({ length: totalSlides }).map((_, idx) => (
-            <button 
-              key={idx}
-              onClick={() => setCurrentSlide(idx)}
-              className="h-2.5 rounded-full transition-all duration-300"
-              style={{ 
-                width: currentSlide === idx ? '24px' : '10px', 
-                backgroundColor: currentSlide === idx ? brandColor : '#27272a' 
-              }}
-              title={`Vai alla slide ${idx + 1}`}
-            />
-          ))}
-        </div>
-
-        {/* Tasti Avanti / Indietro */}
-        <div className="flex space-x-3 w-full sm:w-auto">
-          <button 
-            disabled={currentSlide === 0}
-            onClick={() => setCurrentSlide(prev => prev - 1)}
-            className="flex-1 sm:flex-initial px-6 py-3 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-30 border border-zinc-800 text-white font-bold text-xs rounded-xl transition"
-          >
-            ◀ Precedente
-          </button>
-          <button 
-            disabled={currentSlide === totalSlides - 1}
-            onClick={() => setCurrentSlide(prev => prev + 1)}
-            className="flex-1 sm:flex-initial px-6 py-3 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-30 border border-zinc-800 text-white font-bold text-xs rounded-xl transition"
-          >
-            Successiva ▶
-          </button>
-        </div>
-      </footer>
-
-    </div>
-  );
-}
+          {Array.from({ length:
