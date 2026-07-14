@@ -183,8 +183,8 @@ export default function SocialCreator() {
                 onChange={(e) => setPlatform(e.target.value)} 
                 className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
-                <option value="instagram">Instagram Carousel Verticale (4:5)</option>
-                <option value="facebook">Post Facebook (4:5)</option>
+                <option value="instagram">Instagram Carousel Verticale (3:4)</option>
+                <option value="facebook">Post Facebook (3:4)</option>
               </select>
             </div>
 
