@@ -366,8 +366,7 @@ export default function SocialCreator() {
               required
               className="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm cursor-pointer"
             >
-              <option value="free_clip">Clip breve montata di cantiere (Gratuito / Incluso)</option>
-              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 150 Crediti)</option>
+              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 2000 Crediti)</option>
             </select>
           </div>
 
