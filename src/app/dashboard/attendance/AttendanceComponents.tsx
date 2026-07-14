@@ -54,7 +54,7 @@ export function TimbratureTab({ loading, records, onEdit }: { loading: boolean, 
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {records.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-zinc-850/50 transition duration-155">
+                  <tr key={rec.id} className="hover:bg-zinc-850/50 transition duration-150">
                     <td className="p-4 pl-6 font-bold text-white">{rec.workers?.name || "Lavoratore rimosso"}</td>
                     <td className="p-4 text-zinc-300">{rec.leads?.customer_name || "Cantiere rimosso"}</td>
                     <td className="p-4 text-zinc-300 font-semibold">{formatDateTime(rec.check_in_time)}</td>
@@ -90,7 +90,7 @@ export function TimbratureTab({ loading, records, onEdit }: { loading: boolean, 
   );
 }
 
-// SCHEDA 2: SCHEDA ANAGRAFICA DIPENDENTI
+// SCHEDA 2: SCHEDA ANAGRAFICA DIPENDENTI (CON GALLERY RAPPORTINI)
 export function DipendentiTab({ loading, workers, records, rapportini, selectedWorker, onSelectWorker, onZoomPhoto }: { loading: boolean, workers: Worker[], records: AttendanceRecord[], rapportini: Rapportino[], selectedWorker: Worker | null, onSelectWorker: (w: Worker) => void, onZoomPhoto: (url: string) => void }) {
   const getWorkerRecords = (id: string) => records.filter(r => r.worker_id === id);
   const getWorkerRapportini = (id: string) => rapportini.filter(r => r.worker_id === id);
@@ -195,28 +195,37 @@ export function TimbraturaModal({ supabaseUrl, supabaseKey, tenant, editingRecor
   const [formCheckOut, setFormCheckOut] = useState('');
   const [formIsValidDistance, setFormIsValidDistance] = useState(true);
 
+  // Risolve definitivamente il bug della tendina vuota in modifica/inserimento sincronizzando i campi in tempo reale
   useEffect(() => {
     if (workers.length > 0 && !formWorkerId) {
       setFormWorkerId(workers[0].id);
     }
+  }, [workers, formWorkerId]);
+
+  useEffect(() => {
     if (cantieri.length > 0 && !formCantiereId) {
       setFormCantiereId(cantieri[0].id);
     }
-  }, [workers, cantieri]);
+  }, [cantieri, formCantiereId]);
 
   useEffect(() => {
     if (editingRecord) {
+      setFormWorkerId(editingRecord.worker_id || (workers[0]?.id || ''));
+      setFormCantiereId(editingRecord.cantiere_id || (cantieri[0]?.id || ''));
       setFormCheckIn(editingRecord.check_in_time ? editingRecord.check_in_time.substring(0, 16) : '');
       setFormCheckOut(editingRecord.check_out_time ? editingRecord.check_out_time.substring(0, 16) : '');
       setFormIsValidDistance(editingRecord.is_valid_distance);
     } else {
       setFormCheckIn(new Date().toISOString().substring(0, 16));
     }
-  }, [editingRecord]);
+  }, [editingRecord, workers, cantieri]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenant || !formWorkerId || !formCantiereId || !formCheckIn) return;
+    if (!tenant || !formWorkerId || !formCantiereId || !formCheckIn) {
+      console.warn("[Modal] Tentativo di salvataggio interrotto. Dati mancanti:", { tenant, formWorkerId, formCantiereId, formCheckIn });
+      return;
+    }
 
     const payload = {
       tenant_id: tenant.id,
