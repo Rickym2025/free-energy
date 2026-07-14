@@ -7,7 +7,7 @@ interface Lead {
   id: string;
   customer_name: string;
   customer_email: string;
-  customer_phone: string;
+  customer_phone: string | null;
   address: string;
   monthly_bill_euro: number;
   notes: string;
@@ -167,7 +167,6 @@ export default function LeadsCRM() {
     }
   };
 
-  // Filtra i rapportini associati a questo cantiere specifico
   const getCantiereRapportini = (cantiereId: string) => {
     return rapportini.filter(r => r.cantiere_id === cantiereId);
   };
@@ -214,7 +213,7 @@ export default function LeadsCRM() {
                 <div 
                   key={lead.id} 
                   onClick={() => setSelectedLead(lead)}
-                  className={`p-6 flex items-center justify-between hover:bg-zinc-850/50 cursor-pointer transition-colors duration-150 ${selectedLead?.id === lead.id ? 'bg-zinc-800/40' : ''}`}
+                  className={`p-6 flex items-center justify-between hover:bg-zinc-850/50 cursor-pointer transition-colors duration-155 ${selectedLead?.id === lead.id ? 'bg-zinc-800/40' : ''}`}
                 >
                   <div>
                     <h3 className="font-bold text-white text-base">{lead.customer_name}</h3>
@@ -246,7 +245,7 @@ export default function LeadsCRM() {
 
               <div className="space-y-4 text-sm text-zinc-300">
                 <p className="leading-relaxed"><strong>📍 Indirizzo:</strong> {selectedLead.address}</p>
-                <p><strong>📞 Cellulare:</strong> {selectedLead.customer_phone}</p>
+                {selectedLead.customer_phone && <p><strong>📞 Cellulare:</strong> {selectedLead.customer_phone}</p>}
                 {selectedLead.customer_email && <p><strong>✉️ Email:</strong> {selectedLead.customer_email}</p>}
                 <p><strong>⚡ Bolletta Stimata:</strong> € {selectedLead.monthly_bill_euro}/mese</p>
                 
@@ -256,7 +255,7 @@ export default function LeadsCRM() {
                 </div>
               </div>
 
-              {/* INTEGRAZIONE RAPPORTINI FOTOGRAFICI (OPZIONE 1) */}
+              {/* INTEGRATO: GALLERIA RAPPORTINI (OPZIONE 1) */}
               <div className="space-y-3 pt-2 border-t border-zinc-800">
                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block font-mono">📸 Foto e Rapportini di Avanzamento Lavori:</span>
                 
@@ -266,7 +265,6 @@ export default function LeadsCRM() {
                   <div className="grid grid-cols-2 gap-3">
                     {getCantiereRapportini(selectedLead.id).map((rap) => (
                       <div key={rap.id} className="bg-zinc-950 border border-zinc-850 rounded-xl overflow-hidden shadow flex flex-col justify-between">
-                        {/* Immagine */}
                         <div 
                           onClick={() => setFullscreenPhotoUrl(rap.photo_url)}
                           className="aspect-[4/3] w-full bg-black cursor-zoom-in overflow-hidden relative group"
@@ -277,7 +275,6 @@ export default function LeadsCRM() {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         </div>
-                        {/* Info sotto foto */}
                         <div className="p-3 space-y-1.5 text-[10px]">
                           <div className="flex justify-between items-center text-zinc-550 font-mono font-semibold">
                             <span>{formatDateTime(rap.created_at)}</span>
@@ -295,7 +292,7 @@ export default function LeadsCRM() {
                 )}
               </div>
 
-              {/* AZIONI E CONTATTI */}
+              {/* AZIONI E CONTATTI CON CONTROLLI DI SICUREZZA PER CELLULARE NULLO */}
               <div className="flex flex-col gap-3 pt-4 border-t border-zinc-800">
                 <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono">Azioni Trattativa</span>
                 <div className="flex gap-2">
@@ -313,28 +310,32 @@ export default function LeadsCRM() {
                   </button>
                 </div>
 
-                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mt-2">Ricontatta</span>
-                <div className="flex gap-2">
-                  <a 
-                    href={`tel:${selectedLead.customer_phone}`}
-                    className="flex-1 py-2.5 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg text-center border border-zinc-800 transition-colors"
-                  >
-                    📞 Chiama
-                  </a>
-                  <a 
-                    href={`https://wa.me/${selectedLead.customer_phone.replace(/\D/g, '')}?text=Ciao%20${encodeURIComponent(selectedLead.customer_name)},%20ti%20contatto%20da%20${encodeURIComponent(tenant?.company_name || '')}%20in%20merito%20all'impianto%20fotovoltaico.`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 py-2.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 text-xs font-bold rounded-lg text-center border border-emerald-900/50 transition-colors"
-                  >
-                    💬 WhatsApp
-                  </a>
-                </div>
+                {selectedLead.customer_phone && (
+                  <>
+                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mt-2">Ricontatta</span>
+                    <div className="flex gap-2">
+                      <a 
+                        href={`tel:${selectedLead.customer_phone}`}
+                        className="flex-1 py-2.5 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold rounded-lg text-center border border-zinc-800 transition-colors"
+                      >
+                        📞 Chiama
+                      </a>
+                      <a 
+                        href={`https://wa.me/${selectedLead.customer_phone.replace(/\D/g, '')}?text=Ciao%20${encodeURIComponent(selectedLead.customer_name)},%20ti%20contatto%20da%20${encodeURIComponent(tenant?.company_name || '')}%20in%20merito%20all'impianto%20fotovoltaico.`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 text-xs font-bold rounded-lg text-center border border-emerald-900/50 transition-colors"
+                      >
+                        💬 WhatsApp
+                      </a>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ) : (
             <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl text-center text-zinc-500 text-sm">
-              Seleziona un contatto dalla lista per visualizzarne i dettagli e gestire lo stato della trattativa o ispezionare le foto dei lavori.
+              Seleziona un contatto dalla lista per visualizzarne i dettagli, gestire lo stato della trattativa o ispezionare le foto dei lavori.
             </div>
           )}
         </div>
