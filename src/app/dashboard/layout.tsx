@@ -15,10 +15,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
   const pathname = usePathname();
   const [showRicaricaModal, setShowRicaricaModal] = useState(false);
-  
-  // Gestione larghezza trascinabile (Draggable) e pulsante contrazione (Toggle)
   const [sidebarWidth, setSidebarWidth] = useState(256);
-  const [lastExpandedWidth, setLastExpandedWidth] = useState(256); // Ricorda l'ultima larghezza allargata
+  const [lastExpandedWidth, setLastExpandedWidth] = useState(256);
   const [isResizing, setIsResizing] = useState(false);
 
   const [chatOpen, setChatOpen] = useState(false);
@@ -27,8 +25,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  
-  // Riferimento per lo scroll automatico della chat di Aurora
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
@@ -44,7 +40,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       const newWidth = e.clientX;
       if (newWidth >= 180 && newWidth <= 380) {
         setSidebarWidth(newWidth);
-        setLastExpandedWidth(newWidth); // Salva la preferenza di trascinamento
+        setLastExpandedWidth(newWidth);
       }
     };
 
@@ -68,7 +64,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     };
   }, [isResizing]);
 
-  // Gestore del pulsante di contrazione manuale (Toggle)
   const toggleSidebar = () => {
     if (sidebarWidth <= 80) {
       setSidebarWidth(lastExpandedWidth);
@@ -137,24 +132,19 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       colorClass: "text-emerald-400",
       items: [
         { name: "Pianificatore (Mappa)", href: "/dashboard/pv-planner", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
-        { name: "Gestione Cantieri & CRM", href: "/dashboard/leads", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> }
-      ]
-    },
-    { name: "Pianificatore (Mappa)", href: "/dashboard/pv-planner", active: true, ... },
-        
-        // AGGIUNGI QUESTO ELEMENTO IN MEZZO:
         { 
           name: "Pianificazione Turni", 
           href: "/dashboard/planning", 
           active: true, 
           icon: (
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2V5a2 2 0 002 2v14a2 2 0 002 2z" />
             </svg>
           )
         },
-        
-        { name: "Gestione Cantieri & CRM", href: "/dashboard/leads", active: true, ... }
+        { name: "Gestione Cantieri & CRM", href: "/dashboard/leads", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> }
+      ]
+    },
     {
       title: "Risorse Umane (HR)",
       colorClass: "text-amber-400",
@@ -206,6 +196,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </svg>
           ), 
           addon: true 
+        },
+        { 
+          name: "Brano d'Impresa AI", 
+          href: "/dashboard/jingle", 
+          active: tenant?.jingle_active, 
+          icon: (
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+          ), 
+          addon: true 
         }
       ]
     },
@@ -221,7 +222,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const brandColor = tenant?.brand_color_hex || '#0284c7';
   const isCollapsed = sidebarWidth <= 80;
 
-  // Correzione SWC: estrapolazione dello stile della variabile d'ambiente per evitare errori del compilatore
   const rootStyle = {
     '--brand-color': brandColor
   } as React.CSSProperties;
@@ -242,14 +242,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         className="hidden md:flex flex-col h-screen sticky top-0 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 flex-shrink-0 z-40 relative transition-all duration-300"
       >
         
-        {/* Maniglia trascinabile sul bordo destro */}
         <div 
           onMouseDown={startResizing}
           className={`absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 transition-all z-50 ${isResizing ? 'bg-emerald-500' : ''}`}
           title="Trascina per allargare"
         />
 
-        {/* Intestazione */}
         <div className="flex items-center space-x-3 w-full overflow-hidden">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm shrink-0" style={{ backgroundColor: brandColor }}>
             {tenant?.company_name.substring(0, 2).toUpperCase()}
@@ -259,7 +257,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Crediti Attivi */}
         <div 
           onClick={() => setShowRicaricaModal(true)}
           className={`bg-zinc-850/80 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:border-emerald-500/40 transition duration-200 w-full mt-4 ${isCollapsed ? 'text-center p-2' : ''}`}
@@ -277,7 +274,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Menu Navigazione */}
         <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar w-full mt-6">
           {sidebarGroups.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-2">
@@ -318,7 +314,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Pulsante Toggle Comprimi/Espandi in fondo */}
         <div className="pt-4 border-t border-zinc-800 w-full flex justify-center">
           <button 
             onClick={toggleSidebar}
@@ -331,12 +326,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       </aside>
 
-      {/* Area del Contenuto Principale */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto relative pb-24">
         {children}
       </main>
 
-      {/* Finestra Modale per Ricarica Crediti */}
       {showRicaricaModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn print:hidden">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-lg relative space-y-6 shadow-2xl">
@@ -354,7 +347,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="space-y-3">
-              {/* Pacchetto 1: Base */}
               <a 
                 href="https://buy.stripe.com/placeholder_ricarica_base" 
                 target="_blank"
@@ -371,7 +363,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 </div>
               </a>
 
-              {/* Pacchetto 2: Pro */}
               <a 
                 href="https://buy.stripe.com/placeholder_ricarica_pro" 
                 target="_blank"
@@ -391,7 +382,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 </div>
               </a>
 
-              {/* Pacchetto 3: Max */}
               <a 
                 href="https://buy.stripe.com/placeholder_ricarica_max" 
                 target="_blank"
