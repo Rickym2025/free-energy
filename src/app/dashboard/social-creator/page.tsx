@@ -26,7 +26,7 @@ export default function SocialCreator() {
     e.preventDefault();
     if (!targetLocation.trim() || !systemDetails.trim()) return;
 
-    const success = await deductCredits(100, `Generazione Carosello Grafico per: ${targetLocation}`);
+    const success = await deductCredits(200, `Generazione Carosello Grafico per: ${targetLocation}`);
     if (!success) return;
 
     setIsGenerating(true);
@@ -158,7 +158,7 @@ export default function SocialCreator() {
               className="w-full py-4 text-zinc-950 font-bold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 text-sm" 
               style={{ backgroundColor: brandColor }}
             >
-              {isGenerating ? "Creazione Grafica..." : "✨ Genera Carosello (100 crediti)"}
+              {isGenerating ? "Creazione Grafica..." : "✨ Genera Carosello (200 crediti)"}
             </button>
           </form>
         </div>
