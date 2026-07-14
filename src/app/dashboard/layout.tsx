@@ -15,7 +15,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { tenant, loading } = useTenant();
   const pathname = usePathname();
   const [showRicaricaModal, setShowRicaricaModal] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Stati per la gestione della larghezza trascinabile (Draggable)
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [isResizing, setIsResizing] = useState(false);
 
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -26,6 +29,43 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
+
+  // Gestore per l'avvio del trascinamento sul bordo della barra
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  // Effetto per calcolare il trascinamento del mouse in tempo reale
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      // Imposta i limiti di ridimensionamento (Minimo 180px, Massimo 380px)
+      const newWidth = e.clientX;
+      if (newWidth >= 180 && newWidth <= 380) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none'; // Previene la selezione del testo durante il drag
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -85,8 +125,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       title: "Pianificazione & Cantieri",
       colorClass: "text-emerald-400",
       items: [
-        { name: "Pianificatore (Mappa)", href: "/dashboard/pv-planner", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
-        { name: "Gestione Cantieri & CRM", href: "/dashboard/leads", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> }
+        { name: "Pianificatore (Mappa)", href: "/dashboard/pv-planner", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg> },
+        { name: "Gestione Cantieri & CRM", href: "/dashboard/leads", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg> }
       ]
     },
     {
@@ -98,20 +138,20 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           href: "/dashboard/job-postings", 
           active: true, 
           icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 2v4a2 2 0 002 2h4" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12H8m0 4h8" />
             </svg>
           )
         },
-        { name: "Valutazione CV", href: "/dashboard/cv-evaluator", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+        { name: "Valutazione CV", href: "/dashboard/cv-evaluator", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
         { 
           name: "Registro Presenze", 
           href: "/dashboard/attendance", 
           active: true, 
           icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           )
@@ -122,20 +162,20 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       title: "Marketing",
       colorClass: "text-sky-400",
       items: [
-        { name: "Creatore Post Social", href: "/dashboard/social-creator", active: true, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> }
+        { name: "Creatore Post Social", href: "/dashboard/social-creator", active: true, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> }
       ]
     },
     {
       title: "Servizi Premium",
       colorClass: "text-purple-400", 
       items: [
-        { name: "Nexus Assistente Sitoweb", href: "/dashboard/nexus", active: tenant?.nexus_active, icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>, addon: true },
+        { name: "Assistente Chat AI", href: "/dashboard/nexus", active: tenant?.nexus_active, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>, addon: true },
         { 
           name: "Centralino AI H24", 
           href: "/dashboard/dentis", 
           active: tenant?.dentis_active, 
           icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2zM9 9h6M9 13h3" />
             </svg>
           ), 
@@ -147,7 +187,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       title: "Amministrazione",
       colorClass: "text-zinc-500",
       items: [
-        { name: "Impostazioni Marchio", href: "/dashboard/settings", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> }
+        { name: "Impostazioni Marchio", href: "/dashboard/settings", icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> }
       ]
     }
   ];
@@ -162,45 +202,60 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Definisce se la barra è contratta (sotto la larghezza di 140px per nascondere testi)
+  const isCollapsed = sidebarWidth < 140;
+
   return (
     <div className="min-h-screen bg-transparent text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
       
-      <aside className={`hidden md:flex flex-col h-screen sticky top-0 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 flex-shrink-0 z-40 transition-all duration-300 ${sidebarCollapsed ? 'w-20 items-center px-4' : 'w-64 space-y-6'}`}>
+      {/* CORRETTO: aside ora ha larghezza dinamica gestita inline */}
+      <aside 
+        ref={messagesEndRef}
+        style={{ width: `${sidebarWidth}px` }}
+        className="hidden md:flex flex-col h-screen sticky top-0 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 flex-shrink-0 z-40 relative transition-shadow duration-300"
+      >
         
+        {/* Maniglia trascinabile sul bordo destro (Drag Handle) */}
+        <div 
+          onMouseDown={startResizing}
+          className={`absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 transition-all z-50 ${isResizing ? 'bg-emerald-500' : ''}`}
+          title="Trascina per ridimensionare"
+        />
+
         {/* Intestazione */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 w-full overflow-hidden">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm shrink-0" style={{ backgroundColor: brandColor }}>
             {tenant?.company_name.substring(0, 2).toUpperCase()}
           </div>
-          {!sidebarCollapsed && (
-            <span className="font-bold text-lg text-white tracking-tight truncate">{tenant?.company_name}</span>
+          {!isCollapsed && (
+            <span className="font-bold text-lg text-white tracking-tight truncate animate-fadeIn">{tenant?.company_name}</span>
           )}
         </div>
 
         {/* Crediti Attivi */}
         <div 
           onClick={() => setShowRicaricaModal(true)}
-          className={`bg-zinc-850/80 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:border-emerald-500/40 transition duration-200 w-full ${sidebarCollapsed ? 'text-center p-2' : ''}`}
+          className={`bg-zinc-850/80 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:border-emerald-500/40 transition duration-200 w-full mt-4 ${isCollapsed ? 'text-center p-2' : ''}`}
         >
-          {sidebarCollapsed ? (
+          {isCollapsed ? (
             <span className="text-xl block" title={`Crediti: ${tenant?.credits.toLocaleString()}`}>💳</span>
           ) : (
-            <>
+            <div className="animate-fadeIn">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase">Crediti</span>
                 <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-wide">💳 Ricarica</span>
               </div>
               <span className="text-2xl font-black text-white mt-1 block truncate">{tenant?.credits.toLocaleString()}</span>
-            </>
+            </div>
           )}
         </div>
 
         {/* Menu Navigazione */}
-        <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar w-full">
+        <nav className="flex-1 space-y-6 overflow-y-auto no-scrollbar w-full mt-6">
           {sidebarGroups.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-2">
-              {!sidebarCollapsed && (
-                <span className={`text-[10px] font-extrabold uppercase tracking-widest ${group.colorClass} block px-2 opacity-80`}>
+              {!isCollapsed && (
+                <span className="text-[10px] font-extrabold uppercase tracking-widest block px-2 opacity-80 truncate animate-fadeIn" style={{ color: brandColor }}>
                   {group.title}
                 </span>
               )}
@@ -219,15 +274,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                           : isLockedAndGreyed 
                             ? 'text-zinc-650 opacity-40 hover:text-zinc-500 hover:opacity-60 bg-zinc-950/20 font-medium cursor-pointer' 
                             : 'text-zinc-300 hover:text-white hover:bg-zinc-800/30 font-semibold cursor-pointer' 
-                      } ${sidebarCollapsed ? 'justify-center px-2 py-3' : ''}`} 
-                      title={sidebarCollapsed ? item.name : undefined}
-                      style={isActive && !sidebarCollapsed ? { borderLeft: `3px solid ${brandColor}` } : {}}
+                      } ${isCollapsed ? 'justify-center px-2 py-3' : ''}`} 
+                      title={isCollapsed ? item.name : undefined}
+                      style={isActive && !isCollapsed ? { borderLeft: `3px solid ${brandColor}` } : {}}
                     >
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3 truncate">
                         <span style={isActive ? { color: brandColor } : {}}>{item.icon}</span>
-                        {!sidebarCollapsed && <span>{item.name}</span>}
+                        {!isCollapsed && <span className="truncate animate-fadeIn">{item.name}</span>}
                       </div>
-                      {!sidebarCollapsed && isLockedAndGreyed && <span className="text-xs">🔒</span>}
+                      {!isCollapsed && isLockedAndGreyed && <span className="text-xs shrink-0">🔒</span>}
                     </Link>
                   );
                 })}
@@ -235,24 +290,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
-
-        {/* Pulsante Toggle Comprimi/Espandi in fondo */}
-        <div className="pt-4 border-t border-zinc-800 w-full flex justify-center">
-          <button 
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-10 h-10 bg-zinc-950 hover:bg-zinc-800 border border-zinc-850 rounded-xl flex items-center justify-center text-sm transition-colors text-zinc-455"
-            title={sidebarCollapsed ? "Espandi Sidebar" : "Comprimi Sidebar"}
-          >
-            {sidebarCollapsed ? "▶" : "◀"}
-          </button>
-        </div>
-
       </aside>
 
+      {/* Area del Contenuto Principale */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto relative pb-24">
         {children}
       </main>
 
+      {/* Finestra Modale per Ricarica Crediti */}
       {showRicaricaModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn print:hidden">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-md relative space-y-6">
@@ -291,6 +336,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
+      {/* Chatbot Galleggiante */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
         {chatOpen && (
           <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
@@ -325,7 +371,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         )}
 
         <button onClick={() => setChatOpen(!chatOpen)} className="w-14 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-full shadow-lg flex items-center justify-center transition duration-200">
-          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
+          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
         </button>
       </div>
 
