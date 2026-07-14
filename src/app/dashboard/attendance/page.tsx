@@ -70,6 +70,13 @@ export default function AttendancePage() {
     if (tenant) fetchData();
   }, [tenant]);
 
+  // Seleziona automaticamente il primo lavoratore non appena caricato per evitare la schermata vuota
+  useEffect(() => {
+    if (workers.length > 0 && !selectedWorker) {
+      setSelectedWorker(workers[0]);
+    }
+  }, [workers, selectedWorker]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -91,13 +98,11 @@ export default function AttendancePage() {
 
   const fetchWorkers = async () => {
     if (!tenant) return;
-    console.log(`[Attendance] Scaricamento tabella workers per tenant: ${tenant.id}`);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/workers?tenant_id=eq.${tenant.id}&select=*&order=name.asc`, {
       headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     });
     if (res.ok) {
       const data = await res.json();
-      console.log(`[Attendance] Dipendenti rilevati nel database:`, data);
       setWorkers(data);
     }
   };
@@ -116,6 +121,26 @@ export default function AttendancePage() {
       headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     });
     if (res.ok) setRapportini(await res.json());
+  };
+
+  const handleOpenCreateModal = () => {
+    setEditingRecord(null);
+    setFormWorkerId(workers[0]?.id || '');
+    setFormCantiereId(cantieri[0]?.id || '');
+    setFormCheckIn(new Date().toISOString().substring(0, 16));
+    setFormCheckOut('');
+    setFormIsValidDistance(true);
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (rec: AttendanceRecord) => {
+    setEditingRecord(rec);
+    setFormWorkerId(rec.worker_id);
+    setFormCantiereId(rec.cantiere_id || '');
+    setFormCheckIn(rec.check_in_time ? rec.check_in_time.substring(0, 16) : '');
+    setFormCheckOut(rec.check_out_time ? rec.check_out_time.substring(0, 16) : '');
+    setFormIsValidDistance(rec.is_valid_distance);
+    setShowModal(true);
   };
 
   return (
