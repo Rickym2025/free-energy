@@ -55,6 +55,49 @@ export default function ReportPreview({
     }, 1000);
   };
 
+  // Funzione logica per convertire questo preventivo in un cantiere reale nel CRM
+  const handleConvertToCantiere = async () => {
+    if (!tenant) return;
+
+    // Funzione di inizializzazione sicura per prevenire stringhe "undefined" o vuote
+    const getEnvVar = (value: string | undefined, fallback: string): string => {
+      if (!value || value === "undefined" || value.trim() === "" || value === "null") return fallback;
+      return value.replace(/^["']|["']$/g, '').trim();
+    };
+    const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL, "https://hmpxgbzykwwqgfzifdlc.supabase.co").replace(/\/$/, '');
+    const SUPABASE_ANON_KEY = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmcHhnYnp5a3d3cWdmemlmZGxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MTA0NjAsImV4cCI6MjA5OTM4NjQ2MH0.eAq1O2IOiSRPYewnBTi9xuxeJlPxVa5OIW6f7qN9hIw");
+
+    const payload = {
+      tenant_id: tenant.id,
+      customer_name: address ? `Cantiere ${address.split(',')[0]}` : "Nuovo Cantiere",
+      address: address || "Indirizzo non specificato",
+      monthly_bill_euro: Math.round(annualSavings / 12), // Stima bolletta basata sul risparmio
+      status: "sopralluogo",
+      notes: `Generato in automatico da PV Planner.\nPotenza impianto stimata: ${peakPower.toFixed(2)} kWp\nNumero moduli totali: ${totalPanels}\nRisparmio economico stimato: €${Math.round(annualSavings)}/anno\nCosto impianto totale: €${estimatedCost.toLocaleString()}`
+    };
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        alert("Cantiere aperto e registrato con successo nel CRM!");
+      } else {
+        const errText = await response.text();
+        console.error("Errore salvataggio cantiere:", errText);
+      }
+    } catch (err) {
+      console.error("Errore di rete durante la conversione:", err);
+    }
+  };
+
   const totalPanels = savedRoofs.reduce((acc, r) => acc + r.panelCount, 0);
   const brandColor = tenant?.brand_color_hex || '#0284c7';
 
@@ -163,7 +206,7 @@ export default function ReportPreview({
       </div>
 
       {/* --- SECONDA PAGINA DEL PREVENTIVO --- */}
-      <div className="print-page-break pt-8 border-t border-zinc-800 print:border-t-0 grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="print-page-break pt-8 border-t border-zinc-800 print:break-before-page grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-zinc-300 print:text-zinc-800 uppercase tracking-wider">Servizi inclusi nella nostra fornitura:</h3>
           <ul className="text-xs text-zinc-400 print:text-zinc-700 space-y-2.5 list-disc pl-4">
@@ -202,13 +245,24 @@ export default function ReportPreview({
         </div>
       </div>
 
-      <div className="border-t border-zinc-800 pt-6 flex items-center justify-between print:hidden">
-        <span className="text-xs text-zinc-500">
+      <div className="border-t border-zinc-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 print:hidden">
+        <span className="text-xs text-zinc-500 max-w-xl">
           *Il preventivo è interamente editabile. Modifica i numeri direttamente a schermo prima di premere esporta per allinearli ai tuoi listini esatti.
         </span>
-        <button onClick={handlePrintPdf} className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition">
-          🖨️ Stampa / Esporta PDF
-        </button>
+        <div className="flex space-x-3 w-full md:w-auto">
+          <button 
+            onClick={handleConvertToCantiere}
+            className="flex-1 md:flex-initial px-6 py-3 bg-zinc-800 hover:bg-zinc-750 text-white font-bold rounded-xl text-sm transition"
+          >
+            🚀 Apri Cantiere
+          </button>
+          <button 
+            onClick={handlePrintPdf} 
+            className="flex-1 md:flex-initial px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition"
+          >
+            🖨️ Stampa / Esporta PDF
+          </button>
+        </div>
       </div>
 
     </div>
