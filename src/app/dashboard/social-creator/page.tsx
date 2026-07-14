@@ -281,7 +281,7 @@ export default function SocialCreator() {
         <form 
           action="https://api.web3forms.com/submit" 
           method="POST" 
-          enctype="multipart/form-data"
+          encType="multipart/form-data"
           className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10"
         >
           {/* Chiave di Accesso Web3Forms */}
