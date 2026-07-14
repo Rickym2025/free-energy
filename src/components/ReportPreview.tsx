@@ -116,7 +116,7 @@ export default function ReportPreview({
       total_power_kw: peakPower,
       panel_count: totalPanels,
       estimated_cost_euro: estimatedCost,
-      total_area_sqm: areaSqm,
+      roof_area_sqm: areaSqm,
       annual_production_kwh: annualProduction,
       annual_savings_euro: annualSavings,
       monthly_bill_euro: Math.round(annualSavings / 12)
