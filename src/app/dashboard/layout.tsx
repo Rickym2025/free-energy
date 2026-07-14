@@ -16,8 +16,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showRicaricaModal, setShowRicaricaModal] = useState(false);
   
-  // Stati per la gestione della larghezza trascinabile (Draggable)
+  // Gestione larghezza trascinabile (Draggable) e pulsante contrazione (Toggle)
   const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [lastExpandedWidth, setLastExpandedWidth] = useState(256); // Ricorda l'ultima larghezza allargata
   const [isResizing, setIsResizing] = useState(false);
 
   const [chatOpen, setChatOpen] = useState(false);
@@ -30,20 +31,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
 
-  // Gestore per l'avvio del trascinamento sul bordo della barra
   const startResizing = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
   };
 
-  // Effetto per calcolare il trascinamento del mouse in tempo reale
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      // Imposta i limiti di ridimensionamento (Minimo 180px, Massimo 380px)
       const newWidth = e.clientX;
       if (newWidth >= 180 && newWidth <= 380) {
         setSidebarWidth(newWidth);
+        setLastExpandedWidth(newWidth); // Salva la preferenza di trascinamento
       }
     };
 
@@ -55,7 +54,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none'; // Previene la selezione del testo durante il drag
+      document.body.style.userSelect = 'none';
     } else {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -66,6 +65,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
+
+  // Gestore del pulsante di contrazione manuale (Toggle)
+  const toggleSidebar = () => {
+    if (sidebarWidth <= 80) {
+      // Se è già contratta, espandila ripristinando l'ultima larghezza preferita dall'utente
+      setSidebarWidth(lastExpandedWidth);
+    } else {
+      // Se è aperta, contratta a icona fissa (72px)
+      setLastExpandedWidth(sidebarWidth);
+      setSidebarWidth(72);
+    }
+  };
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -169,7 +180,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       title: "Servizi Premium",
       colorClass: "text-purple-400", 
       items: [
-        { name: "Assistente Chat AI", href: "/dashboard/nexus", active: tenant?.nexus_active, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>, addon: true },
+        { name: "Nexus Assistente Sitoweb", href: "/dashboard/nexus", active: tenant?.nexus_active, icon: <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>, addon: true },
         { 
           name: "Centralino AI H24", 
           href: "/dashboard/dentis", 
@@ -202,24 +213,21 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Definisce se la barra è contratta (sotto la larghezza di 140px per nascondere testi)
-  const isCollapsed = sidebarWidth < 140;
+  const isCollapsed = sidebarWidth <= 80;
 
   return (
     <div className="min-h-screen bg-transparent text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
       
-      {/* CORRETTO: aside ora ha larghezza dinamica gestita inline */}
       <aside 
-        ref={messagesEndRef}
         style={{ width: `${sidebarWidth}px` }}
-        className="hidden md:flex flex-col h-screen sticky top-0 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 flex-shrink-0 z-40 relative transition-shadow duration-300"
+        className="hidden md:flex flex-col h-screen sticky top-0 bg-zinc-900/90 backdrop-blur-md border-r border-zinc-800 p-6 flex-shrink-0 z-40 relative transition-all duration-300"
       >
         
-        {/* Maniglia trascinabile sul bordo destro (Drag Handle) */}
+        {/* Maniglia trascinabile sul bordo destro */}
         <div 
           onMouseDown={startResizing}
           className={`absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 transition-all z-50 ${isResizing ? 'bg-emerald-500' : ''}`}
-          title="Trascina per ridimensionare"
+          title="Trascina per allargare"
         />
 
         {/* Intestazione */}
@@ -290,14 +298,24 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </nav>
+
+        {/* Pulsante Toggle Comprimi/Espandi integrato */}
+        <div className="pt-4 border-t border-zinc-800 w-full flex justify-center">
+          <button 
+            onClick={toggleSidebar}
+            className="w-10 h-10 bg-zinc-950 hover:bg-zinc-800 border border-zinc-850 rounded-xl flex items-center justify-center text-sm transition-colors text-zinc-400"
+            title={isCollapsed ? "Espandi Sidebar" : "Riduci a Icone"}
+          >
+            {isCollapsed ? "▶" : "◀"}
+          </button>
+        </div>
+
       </aside>
 
-      {/* Area del Contenuto Principale */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto relative pb-24">
         {children}
       </main>
 
-      {/* Finestra Modale per Ricarica Crediti */}
       {showRicaricaModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn print:hidden">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-md relative space-y-6">
@@ -336,7 +354,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Chatbot Galleggiante */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
         {chatOpen && (
           <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
@@ -371,7 +388,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         )}
 
         <button onClick={() => setChatOpen(!chatOpen)} className="w-14 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-full shadow-lg flex items-center justify-center transition duration-200">
-          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
+          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
         </button>
       </div>
 
