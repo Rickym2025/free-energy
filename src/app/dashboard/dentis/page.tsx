@@ -9,7 +9,7 @@ export default function DentisServicePage() {
   const [calendarId, setCalendarId] = useState('');
   const [activeStep, setActiveStep] = useState<number | null>(null);
 
-  const costCredits = 2000;
+  const costCredits = 1500;
 
   const handleUnlock = async () => {
     setActivating(true);
