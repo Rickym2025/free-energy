@@ -16,7 +16,7 @@ export default function SocialCreator() {
   const [platform, setPlatform] = useState('instagram');
   const [marketingAngle, setMarketingAngle] = useState('risparmio');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedSlides, setGeneratedSlides] = useState<string[]>([]);
+  const [generatedSlides, setGeneratedSlides] = useState<any[]>([]); // Cambiato in any[] per supportare stringhe e oggetti
   const [socialCopy, setSocialCopy] = useState<SocialCopy | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
@@ -84,6 +84,12 @@ export default function SocialCreator() {
   };
 
   const brandColor = tenant?.brand_color_hex || '#0284c7';
+
+  // Helper per estrarre l'indirizzo dell'immagine (se stringa o oggetto JSON Ideogram)
+  const getImageUrl = (slide: any) => {
+    if (!slide) return '';
+    return typeof slide === 'object' ? slide.image_url : slide;
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 space-y-8 pb-16">
@@ -169,7 +175,7 @@ export default function SocialCreator() {
             <h2 className="text-lg font-bold text-white">Anteprima Carosello 4:5</h2>
             {generatedSlides.length > 0 && (
               <button 
-                onClick={() => handleDownloadSlide(generatedSlides[currentSlideIndex], currentSlideIndex)}
+                onClick={() => handleDownloadSlide(getImageUrl(generatedSlides[currentSlideIndex]), currentSlideIndex)}
                 className="px-4 py-2 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-xs font-semibold text-zinc-300 transition-colors"
               >
                 📥 Scarica Slide Corrente
@@ -188,7 +194,7 @@ export default function SocialCreator() {
                 {/* Visualizzatore Slide 4:5 */}
                 <div className="aspect-[4/5] w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl">
                   <img 
-                    src={generatedSlides[currentSlideIndex]} 
+                    src={getImageUrl(generatedSlides[currentSlideIndex])} 
                     alt={`Slide ${currentSlideIndex + 1}`}
                     className="w-full h-full object-cover animate-fadeIn" 
                   />
@@ -236,7 +242,7 @@ export default function SocialCreator() {
             {socialCopy.instagram && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram</span>
-                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.instagram}
                 </p>
               </div>
@@ -246,7 +252,7 @@ export default function SocialCreator() {
             {socialCopy.facebook && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">👥 Facebook</span>
-                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.facebook}
                 </p>
               </div>
