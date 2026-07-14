@@ -8,7 +8,7 @@ export default function NexusServicePage() {
   const [copied, setCopied] = useState(false);
   const [activating, setActivating] = useState(false);
 
-  const costCredits = 1000;
+  const costCredits = 500;
 
   const handleUnlock = async () => {
     setActivating(true);
