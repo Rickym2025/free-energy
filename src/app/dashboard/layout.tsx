@@ -316,85 +316,85 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
+      {/* Finestra Modale per Ricarica Crediti (Nuovi Pacchetti Free Energy) */}
       {showRicaricaModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn print:hidden">
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-md relative space-y-6">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-lg relative space-y-6 shadow-2xl">
             <button 
               onClick={() => setShowRicaricaModal(false)}
               className="absolute top-4 right-4 text-zinc-400 hover:text-white"
             >
               ✕
             </button>
+            
             <div className="text-center">
-              <span className="text-3xl block mb-2">💳</span>
+              <span className="text-3xl block mb-2">☀️</span>
               <h2 className="text-xl font-bold text-white">Ricarica Crediti Free Energy</h2>
-              <p className="text-xs text-zinc-400 mt-1">Scegli un pacchetto prepagato senza scadenze per alimentare i tuoi preventivi.</p>
+              <p className="text-xs text-zinc-400 mt-1">Scegli un pacchetto di crediti prepagati senza scadenza per alimentare i tuoi preventivi e tenere attivi i servizi Premium.</p>
             </div>
 
-            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 flex items-center justify-between">
-              <div>
-                <span className="font-bold text-white text-sm block">Start Pack (Consigliato)</span>
-                <span className="text-[10px] text-zinc-400 block mt-0.5">Include 10.000 crediti prepagati</span>
-              </div>
-              <div className="text-right">
-                <span className="text-xl font-black text-emerald-400">€ 199</span>
-                <span className="text-[10px] text-zinc-500 block">una tantum</span>
-              </div>
+            <div className="space-y-3">
+              {/* Pacchetto 1: Base */}
+              <a 
+                href="https://buy.stripe.com/placeholder_ricarica_base" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 flex items-center justify-between hover:border-emerald-500/40 transition-colors block"
+              >
+                <div className="text-left">
+                  <span className="font-bold text-white text-sm block">Ricarica Base</span>
+                  <span className="text-[10px] text-zinc-500 block mt-0.5">Include 500 crediti prepagati (pari a €10,00/credito)</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-black text-emerald-400">€ 49,00</span>
+                  <span className="text-[10px] text-zinc-500 block">una tantum</span>
+                </div>
+              </a>
+
+              {/* Pacchetto 2: Pro */}
+              <a 
+                href="https://buy.stripe.com/placeholder_ricarica_pro" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-zinc-950 p-4 rounded-xl border-2 border-emerald-500/30 flex items-center justify-between hover:border-emerald-500/60 transition-colors block relative"
+              >
+                <div className="absolute -top-2.5 right-4 bg-emerald-500 text-zinc-950 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
+                  🔥 Consigliato (+10% Bonus)
+                </div>
+                <div className="text-left">
+                  <span className="font-bold text-white text-sm block">Ricarica Pro</span>
+                  <span className="text-[10px] text-zinc-500 block mt-0.5">Include 2.200 crediti (200 crediti omaggio inclusi)</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-black text-emerald-400">€ 179,00</span>
+                  <span className="text-[10px] text-zinc-500 block">una tantum</span>
+                </div>
+              </a>
+
+              {/* Pacchetto 3: Max */}
+              <a 
+                href="https://buy.stripe.com/placeholder_ricarica_max" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 flex items-center justify-between hover:border-emerald-500/40 transition-colors block"
+              >
+                <div className="text-left">
+                  <span className="font-bold text-white text-sm block">Ricarica Max</span>
+                  <span className="text-[10px] text-zinc-500 block mt-0.5">Include 4.500 crediti (1.000 crediti omaggio inclusi)</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-black text-emerald-400">€ 349,00</span>
+                  <span className="text-[10px] text-zinc-500 block">una tantum</span>
+                </div>
+              </a>
             </div>
 
-            <a 
-              href="https://buy.stripe.com/test_free_energy_ricarica" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-xs uppercase tracking-wider block text-center transition"
-            >
-              Acquista ora su Stripe
-            </a>
+            <p className="text-[10px] text-zinc-500 text-center leading-relaxed">
+              La transazione è protetta e gestita in modo sicuro tramite crittografia Stripe. I crediti verranno accreditati istantaneamente sul tuo wallet aziendale al completamento dell'acquisto.
+            </p>
           </div>
         </div>
       )}
-
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
-        {chatOpen && (
-          <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
-            <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
-                <span className="font-bold text-sm text-white">Aurora AI (Assistente)</span>
-              </div>
-              <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white text-lg">✕</button>
-            </div>
-            <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-zinc-900/60 scrollbar-none">
-              {messages.map((m) => (
-                <div key={m.id} className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${m.sender === 'user' ? 'bg-emerald-500 text-zinc-950 ml-auto rounded-br-none' : 'bg-zinc-800 text-zinc-300 mr-auto rounded-bl-none'}`}>
-                  {m.text}
-                </div>
-              ))}
-              {isTyping && <div className="text-zinc-500 italic">Aurora sta digitando...</div>}
-              <div ref={messagesEndRef} />
-            </div>
-            
-            <div className="px-4 py-2.5 bg-zinc-900 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-zinc-850">
-              <button onClick={() => sendChatMessage("Come uso il PV Planner?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium font-sans">🛰️ PV Planner</button>
-              <button onClick={() => sendChatMessage("Come si caricano i CV?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium font-sans">📄 Valutazione CV</button>
-              <button onClick={() => sendChatMessage("Dove trovo il widget per il sito?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium font-sans">🔌 Codice Widget</button>
-            </div>
-
-            <div className="p-3 bg-zinc-950 border-t border-zinc-800 flex gap-2">
-              <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()} placeholder="Fai una domanda..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500" />
-              <button onClick={() => sendChatMessage()} className="bg-emerald-500 text-zinc-950 font-bold px-4 py-2.5 rounded-lg text-xs">Invia</button>
-            </div>
-          </div>
-        )}
-
-        <button onClick={() => setChatOpen(!chatOpen)} className="w-14 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-full shadow-lg flex items-center justify-center transition duration-200">
-          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" stroke-width="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
-        </button>
-      </div>
-
-    </div>
-  );
-}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
