@@ -81,10 +81,11 @@ export default function AttendancePage() {
     }
   }, [tenant]);
 
-  // Risolve il bug del lifecycle: seleziona automaticamente il primo operaio non appena caricato
+  // CORRETTO (Lifecycle): Allinea e seleziona in automatico il primo operaio non appena caricato dal cloud
   useEffect(() => {
     if (workers.length > 0 && !formWorkerId) {
       setFormWorkerId(workers[0].id);
+      console.log(`[Attendance] Lavoratori caricati correttamente nel menu a tendina. Primo selezionato: ${workers[0].name}`);
     }
   }, [workers]);
 
@@ -118,11 +119,15 @@ export default function AttendancePage() {
     if (response.ok) {
       const data = await response.json();
       setRecords(data);
+    } else {
+      const errText = await response.text();
+      console.error("[Attendance] Errore scaricamento timbrature:", response.status, errText);
     }
   };
 
   const fetchWorkers = async () => {
     if (!tenant) return;
+    console.log(`[Attendance] Scaricamento tabella workers per tenant: ${tenant.id}`);
     const response = await fetch(`${SUPABASE_URL}/rest/v1/workers?tenant_id=eq.${tenant.id}&select=*&order=name.asc`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
@@ -131,7 +136,11 @@ export default function AttendancePage() {
     });
     if (response.ok) {
       const data = await response.json();
+      console.log(`[Attendance] Dipendenti rilevati nel database:`, data);
       setWorkers(data);
+    } else {
+      const errText = await response.text();
+      console.error("[Attendance] Errore scaricamento tabella workers:", response.status, errText);
     }
   };
 
@@ -147,10 +156,12 @@ export default function AttendancePage() {
       const data = await response.json();
       setCantieri(data);
       if (data.length > 0) setFormCantiereId(data[0].id);
+    } else {
+      const errText = await response.text();
+      console.error("[Attendance] Errore scaricamento cantieri (leads):", response.status, errText);
     }
   };
 
-  // Carica i Rapportini di fine giornata inviati su Telegram
   const fetchRapportini = async () => {
     if (!tenant) return;
     try {
@@ -354,7 +365,7 @@ export default function AttendancePage() {
                   <tbody className="divide-y divide-zinc-800">
                     {records.map((rec) => (
                       <tr key={rec.id} className="hover:bg-zinc-850/50 transition duration-150">
-                        <td className="p-4 pl-6 font-bold text-white">{rec.workers?.name || "Lavoratore rimosso"}</td>
+                        <td className="p-4 pl-6 font-bold text-white">{rec.workers?.name || "Operaio rimosso"}</td>
                         <td className="p-4 text-zinc-300">{rec.leads?.customer_name || "Cantiere rimosso"}</td>
                         <td className="p-4 text-zinc-300 font-semibold">{formatDateTime(rec.check_in_time)}</td>
                         <td className="p-4 text-zinc-300">
@@ -398,7 +409,7 @@ export default function AttendancePage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* LISTA SINISTRA: SCHEDE DIPENDENTI (4 COLONNE) */}
+              {/* LISTA SINISTRA: SCHEDE DIPENDENTI (5 COLONNE) */}
               <div className="lg:col-span-5 space-y-3">
                 <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider block font-mono px-1">Seleziona un Lavoratore per ispezionare il registro:</span>
                 {workers.map((w) => {
@@ -431,7 +442,7 @@ export default function AttendancePage() {
                 })}
               </div>
 
-              {/* DETTAGLIO SITUAZIONE E GALLERY RAPPORTINI (8 COLONNE) */}
+              {/* DETTAGLIO SITUAZIONE E GALLERY RAPPORTINI (7 COLONNE) */}
               <div className="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl min-h-[450px] space-y-8">
                 {selectedWorker ? (
                   <div className="space-y-8 animate-fadeIn">
@@ -496,7 +507,7 @@ export default function AttendancePage() {
                               <div>
                                 <span className="font-semibold text-zinc-300 block">{rec.leads?.customer_name}</span>
                                 <span className="text-zinc-550 block mt-0.5">
-                                  {formatDateTime(rec.check_in_time)} → {rec.check_out_time ? formatDateTime(rec.check_out_time) : "In Cantiere"}
+                                  {formatDateTime(rec.check_in_time)} → {rec.check_out_time ? formatDateTime(rec.check_out_time) : "Al Lavoro"}
                                 </span>
                               </div>
                               <div>
