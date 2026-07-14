@@ -90,7 +90,7 @@ export default function SocialCreator() {
       
       {/* INTESTAZIONE */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Social Creator</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-white">Creatore Post Social</h1>
         <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
           Genera in tempo reale caroselli grafici ad alto impatto nel formato verticale 4:5, completi di testi asimmetrici, logo e colori aziendali.
         </p>
@@ -185,7 +185,7 @@ export default function SocialCreator() {
               </div>
             ) : generatedSlides.length > 0 ? (
               <div className="flex flex-col items-center space-y-6 w-full max-w-[420px]">
-                {/* Visualizzatore Slide 4:5 (Aspect Verticale) */}
+                {/* Visualizzatore Slide 4:5 */}
                 <div className="aspect-[4/5] w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl">
                   <img 
                     src={generatedSlides[currentSlideIndex]} 
@@ -226,7 +226,7 @@ export default function SocialCreator() {
 
       </div>
 
-      {/* DIDASCALIE SOCIAL GENERATE (LARGHEZZA INTERA IN BASSO) */}
+      {/* DIDASCALIE SOCIAL GENERATE */}
       {socialCopy && (
         <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4 shadow-xl animate-fadeIn">
           <h3 className="text-lg font-bold text-white">Didascalie e Hashtag per i tuoi Canali</h3>
@@ -256,7 +256,7 @@ export default function SocialCreator() {
             {socialCopy.tiktok && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">🎵 TikTok</span>
-                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.tiktok}
                 </p>
               </div>
@@ -264,6 +264,86 @@ export default function SocialCreator() {
           </div>
         </div>
       )}
+
+      {/* SEZIONE CONTATTI WEB3FORMS PER RICHIESTA VIDEO EDITORIALI */}
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none"></div>
+        
+        <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 relative z-10 text-white">
+          <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_10px_#4ade80]"></span>
+          Richiedi Video Promozionale di Cantiere
+        </h2>
+        
+        <p className="text-zinc-400 mb-8 text-sm relative z-10 leading-relaxed">
+          Vuoi realizzare un video montaggio professionale dei tuoi pannelli solari o del lavoro ultimato? Compila il modulo caricando i tuoi video o foto grezze e i nostri Art Director realizzeranno una clip su misura per te entro 48 ore.
+        </p>
+        
+        <form 
+          action="https://api.web3forms.com/submit" 
+          method="POST" 
+          enctype="multipart/form-data"
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10"
+        >
+          {/* Chiave di Accesso Web3Forms */}
+          <input type="hidden" name="access_key" value="9013a8d5-0901-42a0-b9e6-4c45553f960d" />
+          <input type="hidden" name="subject" value={`Richiesta Video Cantiere da: ${tenant?.company_name || 'Installatore'}`} />
+          <input type="hidden" name="redirect" value="https://free-energy.rmstudio.app/dashboard/social-creator" />
+          
+          <div>
+            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Nome di Riferimento</label>
+            <input 
+              type="text" 
+              name="name" 
+              required 
+              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm" 
+              placeholder="Esempio: Riccardo Modena" 
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Email Aziendale</label>
+            <input 
+              type="email" 
+              name="email" 
+              required 
+              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm" 
+              placeholder="Esempio: info@siproenergy.it" 
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Carica Video o Foto di Cantiere (ZIP, MP4, JPG)</label>
+            <input 
+              type="file" 
+              name="attachment" 
+              required 
+              accept=".zip,.mp4,.mov,.avi,.jpg,.png"
+              className="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer" 
+            />
+            <span className="text-[10px] text-zinc-500 mt-1 block">Invia un archivio ZIP contenente le clip del cantiere (dimensione massima: 20MB).</span>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm text-zinc-400 mb-2 uppercase tracking-widest font-bold text-xs">Istruzioni o Richieste Speciali</label>
+            <textarea 
+              name="message" 
+              required 
+              rows={4} 
+              className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors resize-none text-sm leading-relaxed" 
+              placeholder="Descrivi l'angolo comunicativo desiderato, il testo da inserire nei sottotitoli o eventuali brani musicali preferiti..."
+            ></textarea>
+          </div>
+          
+          <div className="md:col-span-2 mt-2">
+            <button 
+              type="submit" 
+              className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-slate-200 transition-transform active:scale-95 text-lg"
+            >
+              Invia Richiesta Creazione Video
+            </button>
+          </div>
+        </form>
+      </div>
 
     </div>
   );
