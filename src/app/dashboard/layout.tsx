@@ -27,6 +27,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  
+  // Riferimento per lo scroll automatico della chat di Aurora
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const WEBHOOK_ADMIN_CHATBOT = 'https://n8n.rmstudio.app/webhook/admin-chatbot';
@@ -69,10 +71,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   // Gestore del pulsante di contrazione manuale (Toggle)
   const toggleSidebar = () => {
     if (sidebarWidth <= 80) {
-      // Se è già contratta, espandila ripristinando l'ultima larghezza preferita dall'utente
       setSidebarWidth(lastExpandedWidth);
     } else {
-      // Se è aperta, contratta a icona fissa (72px)
       setLastExpandedWidth(sidebarWidth);
       setSidebarWidth(72);
     }
@@ -204,6 +204,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   ];
 
   const brandColor = tenant?.brand_color_hex || '#0284c7';
+  const isCollapsed = sidebarWidth <= 80;
+
+  // Correzione SWC: estrapolazione dello stile della variabile d'ambiente per evitare errori del compilatore
+  const rootStyle = {
+    '--brand-color': brandColor
+  } as React.CSSProperties;
 
   if (loading) {
     return (
@@ -213,10 +219,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isCollapsed = sidebarWidth <= 80;
-
   return (
-    <div className="min-h-screen bg-transparent text-zinc-100 flex flex-col md:flex-row" style={{ '--brand-color': brandColor } as React.CSSProperties}>
+    <div className="min-h-screen bg-transparent text-zinc-100 flex flex-col md:flex-row" style={rootStyle}>
       
       <aside 
         style={{ width: `${sidebarWidth}px` }}
@@ -299,7 +303,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Pulsante Toggle Comprimi/Espandi integrato */}
+        {/* Pulsante Toggle Comprimi/Espandi in fondo */}
         <div className="pt-4 border-t border-zinc-800 w-full flex justify-center">
           <button 
             onClick={toggleSidebar}
@@ -312,11 +316,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       </aside>
 
+      {/* Area del Contenuto Principale */}
       <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto relative pb-24">
         {children}
       </main>
 
-      {/* Finestra Modale per Ricarica Crediti (Nuovi Pacchetti Free Energy) */}
+      {/* Finestra Modale per Ricarica Crediti */}
       {showRicaricaModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn print:hidden">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl w-full max-w-lg relative space-y-6 shadow-2xl">
@@ -395,6 +400,49 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+
+      {/* Chatbot Galleggiante */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end print:hidden">
+        {chatOpen && (
+          <div className="w-[380px] h-[540px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4 animate-fadeIn">
+            <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
+                <span className="font-bold text-sm text-white">Aurora AI (Assistente)</span>
+              </div>
+              <button onClick={() => setChatOpen(false)} className="text-zinc-400 hover:text-white text-lg">✕</button>
+            </div>
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-zinc-900/60 scrollbar-none">
+              {messages.map((m) => (
+                <div key={m.id} className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${m.sender === 'user' ? 'bg-emerald-500 text-zinc-950 ml-auto rounded-br-none' : 'bg-zinc-800 text-zinc-300 mr-auto rounded-bl-none'}`}>
+                  {m.text}
+                </div>
+              ))}
+              {isTyping && <div className="text-zinc-500 italic">Aurora sta digitando...</div>}
+              <div ref={messagesEndRef} />
+            </div>
+            
+            <div className="px-4 py-2.5 bg-zinc-900 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-zinc-850">
+              <button onClick={() => sendChatMessage("Come uso il PV Planner?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium font-sans">🛰️ PV Planner</button>
+              <button onClick={() => sendChatMessage("Come si caricano i CV?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium font-sans">📄 Valutazione CV</button>
+              <button onClick={() => sendChatMessage("Dove trovo il widget per il sito?")} className="bg-zinc-800 hover:bg-zinc-750 text-[10px] px-3 py-1.5 rounded-full text-zinc-300 shrink-0 font-medium font-sans">🔌 Codice Widget</button>
+            </div>
+
+            <div className="p-3 bg-zinc-950 border-t border-zinc-800 flex gap-2">
+              <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()} placeholder="Fai una domanda..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500" />
+              <button onClick={() => sendChatMessage()} className="bg-emerald-500 text-zinc-950 font-bold px-4 py-2.5 rounded-lg text-xs">Invia</button>
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => setChatOpen(!chatOpen)} className="w-14 h-14 bg-emerald-500 hover:bg-emerald-400 rounded-full shadow-lg flex items-center justify-center transition duration-200">
+          <svg className="w-6 h-6 text-zinc-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 11-2-2V6a2 2 0 112-2h14a2 2 0 112 2v8a2 2 0 11-2 2h-5l-5 5v-5z" /></svg>
+        </button>
+      </div>
+
+    </div>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
