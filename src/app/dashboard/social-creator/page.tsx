@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState } from 'react';
 import { useTenant } from '@/app/context/TenantContext';
 
@@ -13,11 +12,12 @@ export default function SocialCreator() {
   const { tenant, deductCredits } = useTenant();
   const [targetLocation, setTargetLocation] = useState('Ariano nel Polesine');
   const [systemDetails, setSystemDetails] = useState('Impianto 6 kWp con accumulo da 10kWh e detrazione fiscale al 50%');
-  const [platform, setPlatform] = useState('instagram');
+  const [platform, setPlatform] = useState('instagram_carousel');
   const [marketingAngle, setMarketingAngle] = useState('risparmio');
+  const [hook, setHook] = useState('curiosita');
+  const [topic, setTopic] = useState('residenziale');
   const [numSlides, setNumSlides] = useState(5);
   const [tone, setTone] = useState('tecnico');
-  
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSlides, setGeneratedSlides] = useState<any[]>([]);
   const [socialCopy, setSocialCopy] = useState<SocialCopy | null>(null);
@@ -25,11 +25,26 @@ export default function SocialCreator() {
 
   const N8N_WEBHOOK_URL = "https://n8n.rmstudio.app/webhook/free-energy-social-creator";
 
+  // Calcola l'aspect ratio corretto da passare a fal.ai / nano-banana-pro
+  const getAspectRatioForFal = (plat: string) => {
+    if (plat === 'instagram_reel') return '9:16';
+    if (plat === 'facebook_post') return '1:1';
+    return '4:5'; // default per Carousel e LinkedIn
+  };
+
+  // Restituisce la classe CSS corretta per adattare l'anteprima visiva nel client
+  const getPreviewAspectClass = (plat: string) => {
+    if (plat === 'instagram_reel') return 'aspect-[9/16] max-w-[280px]';
+    if (plat === 'facebook_post') return 'aspect-[1/1] max-w-[360px]';
+    return 'aspect-[4/5] max-w-[360px]'; // 4:5 standard
+  };
+
   const handleGenerateSocialKit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetLocation.trim() || !systemDetails.trim()) return;
 
-    const success = await deductCredits(200, `Generazione Carosello Grafico per: ${targetLocation}`);
+    // Detrazione aggiornata a 500 crediti
+    const success = await deductCredits(500, `Generazione Social Kit (${platform}) per: ${targetLocation}`);
     if (!success) return;
 
     setIsGenerating(true);
@@ -46,7 +61,10 @@ export default function SocialCreator() {
           location: targetLocation,
           details: systemDetails,
           platform: platform,
+          aspect_ratio: getAspectRatioForFal(platform),
           angle: marketingAngle,
+          hook: hook,
+          topic: topic,
           num_slides: numSlides,
           tone: tone
         })
@@ -79,7 +97,6 @@ export default function SocialCreator() {
     }
   };
 
-  // Sbloccato: download in formato Blob per forzare lo scaricamento reale escludendo i blocchi CORS
   const handleDownloadSlide = async (url: string, index: number) => {
     try {
       const response = await fetch(url);
@@ -98,7 +115,6 @@ export default function SocialCreator() {
   };
 
   const brandColor = tenant?.brand_color_hex || '#0284c7';
-
   const getImageUrl = (slide: any) => {
     if (!slide) return '';
     return typeof slide === 'object' ? slide.image_url : slide;
@@ -106,12 +122,11 @@ export default function SocialCreator() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 space-y-8 pb-16">
-      
       {/* INTESTAZIONE */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-white">Creatore Post Social</h1>
         <p className="text-zinc-400 mt-2 text-sm leading-relaxed">
-          Genera in tempo reale caroselli grafici ad alto impatto nel formato verticale 3:4, completi di testi asimmetrici, logo e colori aziendali.
+          Genera in tempo reale grafiche ad alto impatto per i tuoi canali di marketing locale, complete di testi asimmetrici, ganci psicologici, logo e colori aziendali.
         </p>
       </div>
 
@@ -140,15 +155,61 @@ export default function SocialCreator() {
               <textarea 
                 value={systemDetails} 
                 onChange={(e) => setSystemDetails(e.target.value)} 
-                rows={3} 
+                rows={2} 
                 required 
                 className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none resize-none focus:border-emerald-500" 
               />
             </div>
 
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Formato e Canale</label>
+              <select 
+                value={platform} 
+                onChange={(e) => setPlatform(e.target.value)} 
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+              >
+                <option value="instagram_carousel">Instagram Carousel (4:5)</option>
+                <option value="instagram_reel">Instagram Reel / TikTok (9:16)</option>
+                <option value="facebook_post">Post Facebook (1:1 Quadrato)</option>
+                <option value="linkedin_post">Post LinkedIn (4:5)</option>
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Numero di Slide</label>
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Argomento Principale</label>
+                <select 
+                  value={topic} 
+                  onChange={(e) => setTopic(e.target.value)} 
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="residenziale">Residenziale Classico</option>
+                  <option value="accumulo">Batterie & Indipendenza Notturna</option>
+                  <option value="aziende">Capannoni & B2B Aziendale</option>
+                  <option value="pompa_calore">Integrazione Gas-Free (Pompa)</option>
+                  <option value="efficienza">Manutenzione & Monitoraggio</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Gancio (Hook)</label>
+                <select 
+                  value={hook} 
+                  onChange={(e) => setHook(e.target.value)} 
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="curiosita">Domanda Provocatoria</option>
+                  <option value="numerico">Dati Reali e Numeri alla Mano</option>
+                  <option value="fomo">Paura della Perdita / FOMO</option>
+                  <option value="autorita">Autorità Locale / Credibilità</option>
+                  <option value="urgente">Urgenza Scadenza Detrazioni</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">N. Slide / Scene</label>
                 <select 
                   value={numSlides} 
                   onChange={(e) => setNumSlides(parseInt(e.target.value))} 
@@ -177,18 +238,6 @@ export default function SocialCreator() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Formato e Canale</label>
-              <select 
-                value={platform} 
-                onChange={(e) => setPlatform(e.target.value)} 
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-              >
-                <option value="instagram">Instagram Carousel Verticale (3:4)</option>
-                <option value="facebook">Post Facebook (3:4)</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Angolo di Scrittura</label>
               <select 
                 value={marketingAngle} 
@@ -207,7 +256,7 @@ export default function SocialCreator() {
               className="w-full py-4 text-zinc-950 font-bold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 text-sm" 
               style={{ backgroundColor: brandColor }}
             >
-              {isGenerating ? "Creazione Grafica..." : `✨ Genera Carosello (200 crediti)`}
+              {isGenerating ? "Creazione Grafica..." : `✨ Genera Social Kit (500 crediti)`}
             </button>
           </form>
         </div>
@@ -215,7 +264,9 @@ export default function SocialCreator() {
         {/* VISUALIZZATORE ANTEPRIMA LARGO (8 COLONNE) */}
         <div className="lg:col-span-8 flex flex-col min-h-[600px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-xl">
           <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white">Anteprima Carosello 4:5</h2>
+            <h2 className="text-lg font-bold text-white">
+              Anteprima ({getAspectRatioForFal(platform)})
+            </h2>
             {generatedSlides.length > 0 && (
               <button 
                 onClick={() => handleDownloadSlide(getImageUrl(generatedSlides[currentSlideIndex]), currentSlideIndex)}
@@ -230,24 +281,24 @@ export default function SocialCreator() {
             {isGenerating ? (
               <div className="flex flex-col items-center space-y-4 text-center max-w-sm">
                 <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm text-zinc-400">Generazione in corso delle {numSlides} slide con Ideogram v3...</p>
+                <p className="text-sm text-zinc-400">Generazione in corso delle {numSlides} scene con Nano Banana Pro...</p>
               </div>
             ) : generatedSlides.length > 0 ? (
-              <div className="flex flex-col items-center space-y-6 w-full max-w-[420px]">
-                {/* Visualizzatore Slide 4:5 */}
-                <div className="aspect-[3/4] w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl">
+              <div className="flex flex-col items-center space-y-6 w-full items-center justify-center">
+                {/* Visualizzatore Slide con Aspect Ratio Dinamico */}
+                <div className={`w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl transition-all duration-300 ${getPreviewAspectClass(platform)}`}>
                   <img 
                     src={getImageUrl(generatedSlides[currentSlideIndex])} 
                     alt={`Slide ${currentSlideIndex + 1}`}
                     className="w-full h-full object-cover animate-fadeIn" 
                   />
                   <div className="absolute top-4 left-4 bg-zinc-950/80 border border-zinc-800 px-3 py-1 rounded-lg text-xs text-zinc-300 font-bold font-mono">
-                    Slide {currentSlideIndex + 1} di {generatedSlides.length}
+                    Scena {currentSlideIndex + 1} di {generatedSlides.length}
                   </div>
                 </div>
 
-                {/* Comandi di Navigazione Carosello */}
-                <div className="flex items-center space-x-4 w-full">
+                {/* Comandi di Navigazione */}
+                <div className="flex items-center space-x-4 w-full max-w-[360px]">
                   <button 
                     disabled={currentSlideIndex === 0}
                     onClick={() => setCurrentSlideIndex(prev => prev - 1)}
@@ -267,7 +318,7 @@ export default function SocialCreator() {
             ) : (
               <div className="text-center max-w-sm">
                 <span className="text-4xl block mb-4">🎨</span>
-                <p className="text-sm text-zinc-500">Configura i parametri a sinistra per ottenere il tuo carosello di slide da scaricare e pubblicare sui social.</p>
+                <p className="text-sm text-zinc-500">Configura i parametri a sinistra per ottenere il tuo carosello o reel pronto da scaricare.</p>
               </div>
             )}
           </div>
@@ -281,17 +332,15 @@ export default function SocialCreator() {
           <h3 className="text-lg font-bold text-white">Didascalie e Hashtag per i tuoi Canali</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Instagram */}
             {socialCopy.instagram && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
-                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram</span>
+                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram / Threads</span>
                 <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.instagram}
                 </p>
               </div>
             )}
             
-            {/* Facebook */}
             {socialCopy.facebook && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
                 <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">👥 Facebook</span>
@@ -301,11 +350,10 @@ export default function SocialCreator() {
               </div>
             )}
             
-            {/* TikTok */}
             {socialCopy.tiktok && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
-                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">🎵 TikTok</span>
-                <p className="text-sm text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">🎵 TikTok / YouTube Shorts</span>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.tiktok}
                 </p>
               </div>
@@ -314,7 +362,7 @@ export default function SocialCreator() {
         </div>
       )}
 
-      {/* SEZIONE CONTATTI WEB3FORMS PER RICHIESTA VIDEO */}
+      {/* SEZIONE CONTATTI WEB3FORMS - COSTO AGGIORNATO A 1500 CREDITI */}
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
@@ -366,7 +414,7 @@ export default function SocialCreator() {
               required
               className="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm cursor-pointer"
             >
-              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 2000 Crediti)</option>
+              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 1500 Crediti)</option>
             </select>
           </div>
 
