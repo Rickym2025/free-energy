@@ -22,7 +22,7 @@ export default function JinglePage() {
     if (!tenant || isActivating) return;
 
     if (tenant.jingle_active) {
-      alert("Hai già un ordine attivo per un Brano d'Impresa. Il nostro team ti contatterà a breve.");
+      alert("Hai già un ordine attivo per un Brano personalizzato. Il nostro team ti contatterà a breve.");
       return;
     }
 
