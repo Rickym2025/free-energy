@@ -10,7 +10,7 @@ interface SocialCopy {
 
 export default function SocialCreator() {
   const { tenant, deductCredits } = useTenant();
-  const [targetLocation, setTargetLocation] = useState('Cornegliano Laudense');
+  const [targetLocation, setTargetLocation] = useState('Ariano nel Polesine');
   const [systemDetails, setSystemDetails] = useState('Impianto 6 kWp con accumulo da 10kWh e detrazione fiscale al 50%');
   const [platform, setPlatform] = useState('instagram_carousel');
   const [marketingAngle, setMarketingAngle] = useState('risparmio');
@@ -25,25 +25,27 @@ export default function SocialCreator() {
 
   const N8N_WEBHOOK_URL = "https://n8n.rmstudio.app/webhook/free-energy-social-creator";
 
-  // Calcola l'aspect ratio corretto da passare a fal.ai / nano-banana-pro
+  // Mappatura dei formati per le API di fal.ai / nano-banana-pro
   const getAspectRatioForFal = (plat: string) => {
     if (plat === 'instagram_reel') return '9:16';
     if (plat === 'facebook_post') return '1:1';
-    return '4:5'; // default per Carousel e LinkedIn
+    if (plat === 'linkedin_landscape') return '16:9';
+    return '4:5'; // Default per Instagram Carousel
   };
 
-  // Restituisce la classe CSS corretta per adattare l'anteprima visiva nel client
+  // Classi CSS reattive per adattare la box di anteprima al formato reale
   const getPreviewAspectClass = (plat: string) => {
     if (plat === 'instagram_reel') return 'aspect-[9/16] max-w-[280px]';
-    if (plat === 'facebook_post') return 'aspect-[1/1] max-w-[360px]';
-    return 'aspect-[4/5] max-w-[360px]'; // 4:5 standard
+    if (plat === 'facebook_post') return 'aspect-[1/1] max-w-[340px]';
+    if (plat === 'linkedin_landscape') return 'aspect-[16/9] max-w-[460px]';
+    return 'aspect-[4/5] max-w-[340px]';
   };
 
   const handleGenerateSocialKit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetLocation.trim() || !systemDetails.trim()) return;
 
-    // Detrazione aggiornata a 500 crediti
+    // Detrazione di 500 crediti per la generazione del kit
     const success = await deductCredits(500, `Generazione Social Kit (${platform}) per: ${targetLocation}`);
     if (!success) return;
 
@@ -132,15 +134,15 @@ export default function SocialCreator() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* PANNELLO INPUT (4 COLONNE) */}
-        <div className="lg:col-span-4 bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-6 shadow-xl">
+        {/* PANNELLO INPUT (5 COLONNE - Allargato per evitare wrap estetici) */}
+        <div className="lg:col-span-5 bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-6 shadow-xl">
           <h2 className="text-lg font-bold text-white flex items-center">
             Fase 1: Configura la campagna
           </h2>
           
           <form onSubmit={handleGenerateSocialKit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Località Target (Comune)</label>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Località Target (Comune)</label>
               <input 
                 type="text" 
                 value={targetLocation} 
@@ -151,7 +153,7 @@ export default function SocialCreator() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Dettagli Impianto</label>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Dettagli Impianto</label>
               <textarea 
                 value={systemDetails} 
                 onChange={(e) => setSystemDetails(e.target.value)} 
@@ -162,7 +164,7 @@ export default function SocialCreator() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Formato e Canale</label>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Formato e Canale</label>
               <select 
                 value={platform} 
                 onChange={(e) => setPlatform(e.target.value)} 
@@ -171,13 +173,14 @@ export default function SocialCreator() {
                 <option value="instagram_carousel">Instagram Carousel (4:5)</option>
                 <option value="instagram_reel">Instagram Reel / TikTok (9:16)</option>
                 <option value="facebook_post">Post Facebook (1:1 Quadrato)</option>
-                <option value="linkedin_post">Post LinkedIn (4:5)</option>
+                <option value="linkedin_landscape">Post Professionale / LinkedIn (16:9 Orizzontale)</option>
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* SELETTORI DISPOSTI VERTICALMENTE PER UN DESIGN ORDINATO */}
+            <div className="space-y-4 border-t border-zinc-800/60 pt-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Argomento Principale</label>
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Argomento Principale</label>
                 <select 
                   value={topic} 
                   onChange={(e) => setTopic(e.target.value)} 
@@ -192,7 +195,7 @@ export default function SocialCreator() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Gancio (Hook)</label>
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Gancio (Hook)</label>
                 <select 
                   value={hook} 
                   onChange={(e) => setHook(e.target.value)} 
@@ -209,7 +212,7 @@ export default function SocialCreator() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">N. Slide / Scene</label>
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">N. Slide</label>
                 <select 
                   value={numSlides} 
                   onChange={(e) => setNumSlides(parseInt(e.target.value))} 
@@ -224,7 +227,7 @@ export default function SocialCreator() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Tono di Voce</label>
+                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Tono di Voce</label>
                 <select 
                   value={tone} 
                   onChange={(e) => setTone(e.target.value)} 
@@ -238,7 +241,7 @@ export default function SocialCreator() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Angolo di Scrittura</label>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">Angolo di Scrittura</label>
               <select 
                 value={marketingAngle} 
                 onChange={(e) => setMarketingAngle(e.target.value)} 
@@ -261,8 +264,8 @@ export default function SocialCreator() {
           </form>
         </div>
 
-        {/* VISUALIZZATORE ANTEPRIMA LARGO (8 COLONNE) */}
-        <div className="lg:col-span-8 flex flex-col min-h-[600px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-xl">
+        {/* VISUALIZZATORE ANTEPRIMA LARGO (7 COLONNE) */}
+        <div className="lg:col-span-7 flex flex-col min-h-[600px] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-xl">
           <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">
               Anteprima ({getAspectRatioForFal(platform)})
@@ -281,12 +284,12 @@ export default function SocialCreator() {
             {isGenerating ? (
               <div className="flex flex-col items-center space-y-4 text-center max-w-sm">
                 <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm text-zinc-400">Generazione in corso delle {numSlides} scene con Nano Banana Pro...</p>
+                <p className="text-sm text-zinc-400">Generazione in corso con Nano Banana Pro...</p>
               </div>
             ) : generatedSlides.length > 0 ? (
               <div className="flex flex-col items-center space-y-6 w-full items-center justify-center">
                 {/* Visualizzatore Slide con Aspect Ratio Dinamico */}
-                <div className={`w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl transition-all duration-300 ${getPreviewAspectClass(platform)}`}>
+                <div className={`w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden relative shadow-2xl transition-all duration-300 flex items-center justify-center ${getPreviewAspectClass(platform)}`}>
                   <img 
                     src={getImageUrl(generatedSlides[currentSlideIndex])} 
                     alt={`Slide ${currentSlideIndex + 1}`}
@@ -298,7 +301,7 @@ export default function SocialCreator() {
                 </div>
 
                 {/* Comandi di Navigazione */}
-                <div className="flex items-center space-x-4 w-full max-w-[360px]">
+                <div className="flex items-center space-x-4 w-full max-w-[340px]">
                   <button 
                     disabled={currentSlideIndex === 0}
                     onClick={() => setCurrentSlideIndex(prev => prev - 1)}
@@ -318,7 +321,7 @@ export default function SocialCreator() {
             ) : (
               <div className="text-center max-w-sm">
                 <span className="text-4xl block mb-4">🎨</span>
-                <p className="text-sm text-zinc-500">Configura i parametri a sinistra per ottenere il tuo carosello o reel pronto da scaricare.</p>
+                <p className="text-sm text-zinc-500">Configura i parametri a sinistra per ottenere il tuo kit di immagini da pubblicare sui social.</p>
               </div>
             )}
           </div>
@@ -334,7 +337,7 @@ export default function SocialCreator() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {socialCopy.instagram && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
-                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram / Threads</span>
+                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">📸 Instagram</span>
                 <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.instagram}
                 </p>
@@ -352,7 +355,7 @@ export default function SocialCreator() {
             
             {socialCopy.tiktok && (
               <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800/80 space-y-3">
-                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">🎵 TikTok / YouTube Shorts</span>
+                <span className="text-xs text-zinc-500 font-mono block uppercase tracking-wider font-bold">🎵 TikTok</span>
                 <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
                   {socialCopy.tiktok}
                 </p>
@@ -362,7 +365,7 @@ export default function SocialCreator() {
         </div>
       )}
 
-      {/* SEZIONE CONTATTI WEB3FORMS - COSTO AGGIORNATO A 2000 CREDITI */}
+      {/* SEZIONE CONTATTI WEB3FORMS (Costo riallineato a 2000 crediti) */}
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
