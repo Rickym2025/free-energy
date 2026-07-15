@@ -362,7 +362,7 @@ export default function SocialCreator() {
         </div>
       )}
 
-      {/* SEZIONE CONTATTI WEB3FORMS - COSTO AGGIORNATO A 1500 CREDITI */}
+      {/* SEZIONE CONTATTI WEB3FORMS - COSTO AGGIORNATO A 2000 CREDITI */}
       <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none"></div>
         
@@ -414,7 +414,7 @@ export default function SocialCreator() {
               required
               className="w-full bg-zinc-950 border border-zinc-800 text-zinc-400 rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-colors text-sm cursor-pointer"
             >
-              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 1500 Crediti)</option>
+              <option value="pro_video">Video Promozionale completo da 1 minuto (Costo: 2000 Crediti)</option>
             </select>
           </div>
 
