@@ -26,7 +26,7 @@ export default function JinglePage() {
       return;
     }
 
-    const success = await deductCredits(3000, "Acquisto modulo: BRANO D'IMPRESA AI");
+    const success = await deductCredits(3000, "Acquisto modulo: BRANO JINGLE PERSONALIZZATO");
     if (!success) return;
 
     setIsGenerating(true);
