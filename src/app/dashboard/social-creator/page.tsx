@@ -10,7 +10,7 @@ interface SocialCopy {
 
 export default function SocialCreator() {
   const { tenant, deductCredits } = useTenant();
-  const [targetLocation, setTargetLocation] = useState('Ariano nel Polesine');
+  const [targetLocation, setTargetLocation] = useState('Cornegliano Laudense');
   const [systemDetails, setSystemDetails] = useState('Impianto 6 kWp con accumulo da 10kWh e detrazione fiscale al 50%');
   const [platform, setPlatform] = useState('instagram_carousel');
   const [marketingAngle, setMarketingAngle] = useState('risparmio');
